@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>키보드 내려치기 감지 · 최종</title>
+<style>
+  :root{
+    --bg:#f3f4f1; --panel:#ffffff; --ink:#1c2321; --sub:#5c6763; --line:#d5dad6; --soft:#e8ebe8;
+    --accent:#0f6e5c; --warn:#c8261b; --amber:#a86300; --ok:#2f8f4e;
+    --font:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    --mono:"D2Coding",Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5}
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+         padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  h1{font-size:19px;margin:0}
+  .tagline{font-size:13px;color:var(--sub)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button,select,input[type=text]{font:inherit}
+  button{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.55;cursor:default}
+  button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .pill{padding:4px 10px;border-radius:999px;font-size:13px;border:1px solid var(--line);color:var(--sub);white-space:nowrap}
+  .pill.on{background:#e3f3e8;border-color:var(--ok);color:#1d6436}
+  .pill.wait{background:#fff4dc;border-color:#d9a43c;color:#7a5200}
+
+  #notes{max-width:1100px;margin:12px auto 0;padding:0 20px;display:flex;flex-direction:column;gap:8px}
+  #notes:empty{display:none}
+  .note{padding:10px 14px;border-radius:10px;border:1px solid;font-size:14px}
+  .note.warn{background:#fff6e2;border-color:#e0b45a;color:#5e4100}
+  .note.err{background:#fde9e7;border-color:#e3897f;color:#7d1a12}
+  .note.info{background:#e7f2ef;border-color:#9cc9bc;color:#174b40}
+
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;padding:16px 20px 28px;max-width:1100px;margin:0 auto}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .wide{grid-column:1/-1}
+  h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600}
+  .hint{font-size:13px;color:var(--sub);margin:8px 0 0}
+
+  .meter+.meter{margin-top:14px}
+  .mhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .mhead span{font-weight:700;font-size:15px}
+  .mhead small{font-weight:400;color:var(--sub);font-size:13px}
+  .mhead b{font-size:34px;font-variant-numeric:tabular-nums;line-height:1}
+  .mhead em{font-style:normal;font-size:13px;color:var(--sub);margin-left:6px}
+  .bar{height:18px;background:var(--soft);border-radius:9px;overflow:hidden;position:relative;margin-top:8px}
+  .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .06s linear}
+  .bar.over>i{background:var(--warn)}
+  .bar>b{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:var(--ink);box-shadow:0 0 0 1.5px #fff}
+
+  .big{font-size:52px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .unit{font-size:16px;color:var(--sub);margin-left:4px}
+
+  .hits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-height:120px}
+  .hits li{display:flex;align-items:center;gap:10px;font-size:14px;padding:6px 8px;border-radius:8px;background:#f7f8f6}
+  .hits li.empty{color:var(--sub);background:none;padding-left:0}
+  .hits time{font-family:var(--mono);font-size:12px;color:var(--sub)}
+  .hits .val{font-variant-numeric:tabular-nums;flex:1;white-space:nowrap}
+  .hits .val .hi{color:var(--warn);font-weight:700}
+  .badge{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub);white-space:nowrap}
+  .badge.strong{background:var(--warn);border-color:var(--warn);color:#fff;font-weight:700}
+  .badge.half{background:#fff4dc;border-color:#d9a43c;color:#7a5200}
+
+  .btncheck{display:flex;gap:12px}
+  .btncheck span{flex:1;text-align:center;padding:16px 0;border-radius:10px;border:2px solid var(--line);font-weight:700;color:var(--sub)}
+  .btncheck span.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px 28px}
+  label{display:block;font-size:14px;margin-top:12px}
+  label.check{display:flex;gap:8px;align-items:center}
+  input[type=range]{width:100%}
+  select,input[type=text]{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:4px}
+  details summary{cursor:pointer;color:var(--sub);font-size:14px}
+  #log{font-family:var(--mono);font-size:12.5px;height:220px;overflow:auto;background:#101614;color:#cfe6dc;
+       border-radius:8px;padding:10px;white-space:pre-wrap;margin:10px 0 0}
+
+  /* ---- "그러지 마세요" 경고 화면 ---- */
+  #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+           background:var(--warn);color:#fff;text-align:center;z-index:10;padding:24px}
+  #overlay.show{display:flex;animation:shake .45s}
+  #overlay .msg{font-size:clamp(48px,13vw,170px);font-weight:900;letter-spacing:-.02em;line-height:1.05}
+  #overlay .sub{font-size:clamp(16px,2.6vw,30px);margin-top:18px;opacity:.92}
+  #overlay .hold{margin-top:34px;width:min(520px,80vw);display:flex;flex-direction:column;gap:12px;align-items:center}
+  .btns{display:flex;gap:14px;width:100%}
+  .btns span{flex:1;padding:10px 0;border-radius:10px;border:2px solid rgba(255,255,255,.7);font-weight:700;font-size:18px}
+  .btns span.on{background:#fff;color:var(--warn)}
+  .holdbar{width:100%;height:22px;border-radius:11px;background:rgba(255,255,255,.28);overflow:hidden}
+  .holdbar>i{display:block;height:100%;width:0;background:#fff}
+  #holdText{font-size:18px}
+  #btnHold{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.7);touch-action:none;user-select:none;margin-top:6px}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-14px,6px)}40%{transform:translate(12px,-8px)}
+                   60%{transform:translate(-8px,4px)}80%{transform:translate(6px,-3px)}}
+  @media (prefers-reduced-motion:reduce){#overlay.show{animation:none}.bar>i{transition:none}}
+</style>
+</head>
+<body>
+
+<div id="overlay" role="alert" aria-live="assertive">
+  <div class="msg" id="ovMsg">그러지 마세요</div>
+  <div class="sub" id="ovSub"></div>
+  <div class="hold">
+    <div class="btns"><span id="b1">왼쪽 버튼</span><span id="b2">오른쪽 버튼</span></div>
+    <div class="holdbar"><i id="holdFill"></i></div>
+    <div id="holdText">양쪽 버튼을 함께 3초 동안 누르고 있으면 사라집니다</div>
+    <button id="btnHold" type="button">버튼이 없으면 여기를 누르고 있기</button>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>키보드 내려치기 감지</h1>
+    <div class="tagline">압력 센서 + 진동 모듈 + 양쪽 버튼 2개 · 최종 버전</div>
+  </div>
+  <div class="row">
+    <span class="pill" id="st">연결 안 됨</span>
+    <button class="primary" id="btnConnect" type="button">아두이노 연결</button>
+    <button id="btnTest" type="button">경고 테스트</button>
+    <button id="btnFull" type="button">전체 화면</button>
+  </div>
+</header>
+
+<div id="notes" aria-live="polite"></div>
+
+<main>
+  <section class="wide">
+    <h2>지금 센서 값</h2>
+    <div class="meter">
+      <div class="mhead"><span>압력 <small>갑자기 눌린 양 (손목·키보드 무게는 빼고)</small></span><div><b id="vPress">0</b><em>기준 <span id="tPress">80</span></em></div></div>
+      <div class="bar" id="barPressBox"><i id="barPress"></i><b id="markPress"></b></div>
+    </div>
+    <div class="meter">
+      <div class="mhead"><span>진동 <small>쾅 하는 충격</small></span><div><b id="vShake">0</b><em>기준 <span id="tShake">200</span></em></div></div>
+      <div class="bar" id="barShakeBox"><i id="barShake"></i><b id="markShake"></b></div>
+    </div>
+    <p class="hint" id="modeHint"></p>
+    <p class="hint">막대의 검은 선이 기준입니다. 막대가 빨갛게 바뀌면 기준을 넘은 것입니다.</p>
+    <p class="hint" id="baseText">가만히 있을 때 값: 연결하면 보입니다.</p>
+  </section>
+
+  <section>
+    <h2>방금 친 기록 <small style="font-weight:400">(빨간 숫자 = 기준을 넘음)</small></h2>
+    <ol class="hits" id="hits"><li class="empty">아직 없음. 연결한 뒤 키보드를 쳐 보세요.</li></ol>
+  </section>
+
+  <section>
+    <h2>경고 횟수</h2>
+    <div><span class="big" id="vCount">0</span><span class="unit">번</span></div>
+    <p class="hint">마지막: <span id="vLast">없음</span></p>
+    <p class="hint" id="strongText"></p>
+    <div class="row" style="margin-top:10px"><button id="btnReset" type="button">횟수 지우기</button></div>
+  </section>
+
+  <section>
+    <h2>버튼 확인</h2>
+    <div class="btncheck"><span id="c1">왼쪽</span><span id="c2">오른쪽</span></div>
+    <p class="hint">버튼을 누르면 여기에 불이 들어옵니다. 경고가 떴을 때 두 버튼을 함께 <b id="holdSec">3</b>초 누르고 있으면 꺼집니다.</p>
+  </section>
+
+  <section class="wide">
+    <h2>설정 <small style="font-weight:400">(바꾸면 아두이노에 바로 저장됩니다)</small></h2>
+    <div class="grid2">
+      <div>
+        <label for="sMode">감지 방식</label>
+        <select id="sMode">
+          <option value="3">둘 다 세야 (추천: 타자와 가장 확실하게 구분)</option>
+          <option value="0">압력만</option>
+          <option value="1">진동만</option>
+          <option value="2">둘 중 하나라도 세면 (가장 예민함)</option>
+        </select>
+        <label for="rW">압력 기준: <b id="lW">80</b></label>
+        <input type="range" id="rW" min="5" max="600" step="1" value="80">
+        <label for="rP">진동 기준: <b id="lP">200</b></label>
+        <input type="range" id="rP" min="5" max="1000" step="1" value="200">
+        <div class="row" style="margin-top:14px">
+          <button id="btnCal" type="button">타자 보정 (10초)</button>
+          <button id="btnBase" type="button">기준 다시 재기</button>
+        </div>
+        <p class="hint" id="calText">키보드에 손을 올리고 [타자 보정]을 누르세요. 3초 뒤에 시작하면 10초 동안 평소처럼 타자를 치면 됩니다. 기준값이 자동으로 정해집니다.</p>
+      </div>
+      <div>
+        <label for="sHits">몇 번 세게 쳐야 경고</label>
+        <select id="sHits">
+          <option value="1">1번</option>
+          <option value="2">1.5초 안에 2번</option>
+          <option value="3">1.5초 안에 3번</option>
+        </select>
+        <label for="rT">경고 끄기: 두 버튼을 함께 누르는 시간 <b id="lT">3</b>초</label>
+        <input type="range" id="rT" min="1" max="10" step="0.5" value="3">
+        <label for="tMsg">경고 문구</label>
+        <input type="text" id="tMsg" value="그러지 마세요">
+        <label class="check" for="cBuzz"><input type="checkbox" id="cBuzz" checked> 아두이노 부저 소리 켜기</label>
+        <label class="check" for="cVoice"><input type="checkbox" id="cVoice"> 경고 문구를 소리로도 읽기</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="wide">
+    <details>
+      <summary>아두이노가 보낸 글자 (문제가 생겼을 때 열어 보기)</summary>
+      <pre id="log">아직 연결하지 않았습니다. 위의 [아두이노 연결]을 누르세요.
+아두이노 없이도 [경고 테스트]로 경고 화면을 볼 수 있습니다.</pre>
+    </details>
+  </section>
+</main>
+
+<script>
+/* =====================================================================
+   키보드 내려치기 감지 · 최종 화면
+   아두이노(slam_final.ino)와 USB로 연결해서 쓰는 화면입니다. (크롬 / 엣지)
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const two = v => String(v).padStart(2, '0');
+const clock = () => { const d = new Date(); return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()); };
+const S = {
+  port: null, writer: null, reader: null, readPipe: null,
+  connected: false, ready: false, helloTimer: null,
+  pressTh: 80, shakeTh: 200, holdMs: 3000, hits: 1, mode: 3, muted: 0,
+  dispPress: 0, dispShake: 0, calibrating: false, count: 0
+};
+const MODE_TEXT = {
+  0: '지금 방식: 압력만. 압력이 기준선을 넘으면 경고합니다. 손목을 갑자기 올려도 울릴 수 있어요.',
+  1: '지금 방식: 진동만. 진동이 기준선을 넘으면 경고합니다. 책상을 치거나 키를 아주 세게 쳐도 울릴 수 있어요.',
+  2: '지금 방식: 둘 중 하나. 압력이나 진동 중 하나만 넘어도 경고합니다. 가장 예민해요.',
+  3: '지금 방식: 둘 다 세야. 압력과 진동이 동시에 기준선을 넘어야 경고합니다. 타자는 보통 둘 중 하나만 커서 경고가 안 떠요.'
+};
+
+/* ---------------- 1) 아두이노와 연결 (Web Serial) ---------------- */
+async function connect() {
+  if (S.connected) { await disconnect(); return; }
+  if (!('serial' in navigator)) {
+    note('err', '이 브라우저는 아두이노 연결을 지원하지 않습니다. 크롬이나 엣지로 이 파일을 여세요.', 'browser');
+    return;
+  }
+  try {
+    S.port = await navigator.serial.requestPort();      // 포트 고르는 창
+    await S.port.open({ baudRate: 115200 });             // slam_final.ino 의 Serial.begin(115200) 과 같은 숫자
+  } catch (e) {
+    S.port = null;
+    if (e && e.name === 'NotFoundError') { log('포트를 고르지 않았습니다.'); return; }
+    note('err', '연결 실패: ' + (e && e.message ? e.message : e) +
+      ' · 아두이노 IDE의 시리얼 모니터가 열려 있으면 닫고 다시 누르세요.', 'connect');
+    return;
+  }
+  dropNote('connect'); dropNote('browser');
+  S.writer = S.port.writable.getWriter();
+  S.connected = true; S.ready = false;
+  setStatus('wait');
+  log('연결했습니다. 아두이노가 다시 시작합니다. 1초 동안 센서에서 손을 떼세요.');
+  clearTimeout(S.helloTimer);
+  S.helloTimer = setTimeout(() => {
+    if (S.connected && !S.ready) note('warn', '아두이노에서 답이 없습니다. 최종 코드 slam_final.ino 가 업로드되어 있는지 확인하고, USB를 다시 꽂은 뒤 연결해 보세요.', 'nohello');
+  }, 5000);
+  readLoop();
+}
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  S.readPipe = S.port.readable.pipeTo(decoder.writable).catch(() => {});
+  S.reader = decoder.readable.getReader();
+  let buf = '';
+  try {
+    for (;;) {
+      const { value, done } = await S.reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (line) { try { handleLine(line); } catch (e) { log('화면 오류: ' + e.message); } }
+      }
+      if (buf.length > 2000) buf = '';
+    }
+  } catch (e) {
+    if (S.connected) log('연결이 끊겼습니다: ' + e.message);
+  }
+  if (S.connected) await disconnect();
+}
+
+async function disconnect() {
+  S.connected = false; S.ready = false;
+  clearTimeout(S.helloTimer);
+  try { if (S.reader) await S.reader.cancel(); } catch (e) {}
+  try { if (S.readPipe) await S.readPipe; } catch (e) {}
+  try { if (S.writer) S.writer.releaseLock(); } catch (e) {}
+  try { if (S.port) await S.port.close(); } catch (e) {}
+  S.port = null; S.writer = null; S.reader = null; S.readPipe = null;
+  setStatus('off');
+  log('연결을 끊었습니다.');
+}
+
+async function send(cmd) {
+  if (!S.writer) return false;
+  try { await S.writer.write(new TextEncoder().encode(cmd + '\n')); return true; }
+  catch (e) { log('보내기 실패: ' + e.message); return false; }
+}
+
+/* ---------------- 2) 아두이노가 보낸 글자 해석 ---------------- */
+function handleLine(line) {
+  const p = line.split(',');
+  const n = i => { const v = parseInt(p[i], 10); return isNaN(v) ? 0 : v; };
+  switch (p[0]) {
+    case 'V':       showLive(n(1), n(2)); return;                       // V,압력,진동,압력원래값
+    case 'HIT':     addHit(n(1), n(2), p[3] === '1'); return;           // HIT,압력,진동,강한충격
+    case 'BTN':     showButtons(p[1] === '1', p[2] === '1'); return;    // BTN,왼쪽,오른쪽
+    case 'HOLD':    showHold(n(1)); return;                             // HOLD,밀리초
+    case 'STRONG':  showStrong(n(1), n(2)); return;                     // STRONG,몇번째,필요
+    case 'CAL':     $('calText').textContent = '보정 중… 평소처럼 타자를 계속 치세요 (' + n(1) + '초 남음)'; return;
+    case 'HELLO':
+      S.ready = false; setStatus('wait'); dropNote('wrongsketch');
+      log(line + '  ← 아두이노 시작. 센서에서 손을 떼세요');
+      return;
+    case 'BASE':    showBase(n(1), n(2), n(3)); log(line); return;      // BASE,압력원래값,진동평소값,진동흔들림
+    case 'CFG':     applyCfg(p); log(line); return;
+    case 'READY':
+      S.ready = true; setStatus('on'); clearTimeout(S.helloTimer); dropNote('nohello');
+      log(line + '  ← 준비 끝');
+      return;
+    case 'SLAM':    onSlam(n(1), n(2), p[4] === '1'); log(line); return; // SLAM,압력,진동,누적,테스트
+    case 'CLEAR':   hideWarning(); log(line); return;
+    case 'CALDONE': onCalDone(n(1), n(2), n(3), n(4), n(5)); log(line); return;
+    default:
+      log(line);
+      if (!S.ready && /Baseline|Typing vs Slam|Simple typing|normal value|Commands:/i.test(line)) {
+        note('warn', '지금 아두이노에는 테스트 코드가 올라가 있어요. slam_final.ino 를 업로드한 뒤 다시 연결하세요.', 'wrongsketch');
+      }
+  }
+}
+
+/* ---------------- 3) 화면 표시 ---------------- */
+function scaleFor(th) { return Math.min(1023, Math.max(100, th * 2)); }
+function setBar(name, v, th) {
+  const sc = scaleFor(th);
+  $('bar' + name).style.width = Math.min(100, v / sc * 100) + '%';
+  $('mark' + name).style.left = Math.min(100, th / sc * 100) + '%';
+  $('bar' + name + 'Box').classList.toggle('over', v >= th);
+  $('v' + name).textContent = Math.round(v);
+}
+function showLive(press, shake) {
+  S.dispPress = Math.max(press, S.dispPress * 0.8);
+  S.dispShake = Math.max(shake, S.dispShake * 0.8);
+  if (S.dispPress < 1) S.dispPress = 0;
+  if (S.dispShake < 1) S.dispShake = 0;
+  setBar('Press', S.dispPress, S.pressTh);
+  setBar('Shake', S.dispShake, S.shakeTh);
+}
+function showBase(fsrRaw, shakeRest, shakeNoise) {
+  $('baseText').textContent = '가만히 있을 때 값: 압력 센서 ' + fsrRaw + ' / 1023, 진동 ' + shakeRest + ' (흔들림 ' + shakeNoise + ')';
+  if (fsrRaw > 850) note('warn', '압력 센서가 가만히 있어도 ' + fsrRaw + '만큼 눌려 있어요. 1000 근처에서 꽉 차기 때문에 내려쳐도 잘 안 올라갑니다. 동전을 빼거나 센서에 걸리는 무게를 줄이세요.', 'fsrhigh');
+  else dropNote('fsrhigh');
+  if (fsrRaw < 5) note('info', '압력 센서가 눌리지 않은 상태(0)예요. 키보드 밑에 센서가 닿아 있는지, 배선(5V, A1, 10kΩ)이 맞는지 확인하세요.', 'fsrzero');
+  else dropNote('fsrzero');
+  if (shakeNoise > 15) note('warn', '진동 값이 가만히 있어도 흔들려요(' + shakeNoise + '). 진동 모듈 S→A0, +→5V, −→GND 연결을 확인하거나, 손을 떼고 [기준 다시 재기]를 누르세요.', 'shakenoise');
+  else dropNote('shakenoise');
+}
+function applyCfg(p) {
+  const g = i => parseInt(p[i], 10);
+  if (!isNaN(g(1))) S.pressTh = g(1);
+  if (!isNaN(g(2))) S.shakeTh = g(2);
+  if (!isNaN(g(3))) S.holdMs = g(3);
+  if (!isNaN(g(4))) S.hits = g(4);
+  if (!isNaN(g(5))) S.mode = g(5);
+  if (!isNaN(g(6))) S.muted = g(6);
+  syncControls();
+}
+function syncControls() {
+  $('rW').value = S.pressTh; $('lW').textContent = S.pressTh; $('tPress').textContent = S.pressTh;
+  $('rP').value = S.shakeTh; $('lP').textContent = S.shakeTh; $('tShake').textContent = S.shakeTh;
+  $('sMode').value = String(S.mode);
+  $('sHits').value = String(S.hits);
+  $('rT').value = S.holdMs / 1000; $('lT').textContent = S.holdMs / 1000; $('holdSec').textContent = S.holdMs / 1000;
+  $('cBuzz').checked = !S.muted;
+  $('modeHint').textContent = MODE_TEXT[S.mode] || '';
+  setBar('Press', S.dispPress, S.pressTh);
+  setBar('Shake', S.dispShake, S.shakeTh);
+  showHold(0);
+}
+
+function addHit(press, shake, strong) {
+  const list = $('hits');
+  const empty = list.querySelector('.empty');
+  if (empty) empty.remove();
+  const pOver = press >= S.pressTh, sOver = shake >= S.shakeTh;
+  const li = document.createElement('li');
+  const t = document.createElement('time');
+  t.textContent = clock();
+  const val = document.createElement('span');
+  val.className = 'val';
+  val.innerHTML = '압력 <span class="' + (pOver ? 'hi' : '') + '">' + press + '</span> · 진동 <span class="' + (sOver ? 'hi' : '') + '">' + shake + '</span>';
+  const badge = document.createElement('span');
+  if (strong) { badge.className = 'badge strong'; badge.textContent = '강한 충격'; }
+  else if (S.calibrating) { badge.className = 'badge'; badge.textContent = '보정 중'; }
+  else if (pOver || sOver) { badge.className = 'badge half'; badge.textContent = pOver && sOver ? '둘 다 넘음' : (pOver ? '압력만 넘음' : '진동만 넘음'); }
+  else { badge.className = 'badge'; badge.textContent = '타자'; }
+  li.append(t, val, badge);
+  list.prepend(li);
+  while (list.children.length > 8) list.lastElementChild.remove();
+}
+
+let strongTimer = null;
+function showStrong(k, need) {
+  $('strongText').textContent = '세게 친 횟수 ' + k + ' / ' + need + ' (1.5초 안에 ' + need + '번이면 경고)';
+  clearTimeout(strongTimer);
+  strongTimer = setTimeout(() => { $('strongText').textContent = ''; }, 1600);
+}
+
+function onSlam(press, shake, test) {
+  S.count++;
+  $('vCount').textContent = S.count;
+  $('vLast').textContent = clock() + (test ? ' (테스트)' : ' · 압력 ' + press + ', 진동 ' + shake);
+  showWarning(test ? '테스트 경고' : '오늘 ' + S.count + '번째');
+}
+
+function showWarning(sub) {
+  const msg = $('tMsg').value.trim() || '그러지 마세요';
+  $('ovMsg').textContent = msg;
+  $('ovSub').textContent = sub || '';
+  showHold(0);
+  const ov = $('overlay');
+  ov.classList.remove('show'); void ov.offsetWidth;   // 흔들림을 매번 다시
+  ov.classList.add('show');                           // 버튼을 끝까지 눌러야 사라짐
+  if ($('cVoice').checked && 'speechSynthesis' in window) {
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg); u.lang = 'ko-KR'; speechSynthesis.speak(u); } catch (e) {}
+  }
+}
+function hideWarning() {
+  $('overlay').classList.remove('show');
+  softUp();
+  showHold(0);
+}
+function showButtons(left, right) {
+  $('b1').classList.toggle('on', left);  $('b2').classList.toggle('on', right);
+  $('c1').classList.toggle('on', left);  $('c2').classList.toggle('on', right);
+}
+function showHold(ms) {
+  const sec = S.holdMs / 1000;
+  $('holdFill').style.width = Math.min(100, ms / S.holdMs * 100) + '%';
+  $('holdText').textContent = ms > 0
+    ? '계속 누르고 계세요… ' + Math.max(0, (S.holdMs - ms) / 1000).toFixed(1) + '초 남음'
+    : '양쪽 버튼을 함께 ' + sec + '초 동안 누르고 있으면 사라집니다';
+}
+
+/* 실물 버튼이 없을 때: 화면 버튼을 같은 시간 동안 누르고 있기 */
+let softStart = 0, softTimer = null;
+function softDown(e) {
+  e.preventDefault();
+  if (softTimer) return;
+  softStart = Date.now();
+  softTimer = setInterval(() => {
+    const held = Date.now() - softStart;
+    if (held >= S.holdMs) {
+      softUp();
+      if (S.ready) send('C');       // 아두이노도 경고를 끔 (CLEAR 가 돌아옴)
+      hideWarning();
+    } else showHold(held);
+  }, 50);
+}
+function softUp() {
+  if (!softTimer) return;
+  clearInterval(softTimer); softTimer = null;
+  showHold(0);
+}
+
+function onCalDone(pt, st, tp, ts, taps) {
+  S.calibrating = false;
+  $('btnCal').disabled = false;
+  $('calText').textContent = '보정 끝! 타자 압력 약 ' + tp + ' → 압력 기준 ' + pt + ', 타자 진동 최대 ' + ts + ' → 진동 기준 ' + st +
+    ' (잡힌 타자 ' + taps + '번). 이제 내려쳐서 경고가 뜨는지 확인해 보세요.';
+  if (pt >= 400) note('warn', '타자에도 압력이 크게 나와요. 동전을 빼거나, 압력 센서를 스페이스바에서 조금 먼 곳으로 옮긴 뒤 다시 보정해 보세요.', 'calpress');
+  else dropNote('calpress');
+  if (st >= 900) note('warn', '타자에도 진동이 크게 나와요. 진동 모듈의 금색 판을 키보드 밑이 아니라 키보드 옆 책상에 테이프로 붙이고 다시 보정해 보세요.', 'calshake');
+  else dropNote('calshake');
+  if (taps < 5) note('info', '보정하는 동안 잡힌 타자가 ' + taps + '번뿐이에요. 타자가 아주 약하게 잡힌다는 뜻이라 괜찮지만, 센서가 제대로 붙어 있는지 한 번 확인해 보세요.', 'caltaps');
+  else dropNote('caltaps');
+}
+
+function setStatus(state) {
+  const st = $('st');
+  st.classList.remove('on', 'wait');
+  if (state === 'on') { st.textContent = '연결됨'; st.classList.add('on'); }
+  else if (state === 'wait') { st.textContent = '준비 중 (손 떼기)'; st.classList.add('wait'); }
+  else { st.textContent = '연결 안 됨'; }
+  $('btnConnect').textContent = state === 'off' ? '아두이노 연결' : '연결 끊기';
+}
+function note(kind, text, key) {
+  let el = key ? document.querySelector('#notes [data-key="' + key + '"]') : null;
+  if (!el) { el = document.createElement('div'); if (key) el.dataset.key = key; $('notes').append(el); }
+  el.className = 'note ' + kind;
+  el.textContent = text;
+}
+function dropNote(key) {
+  const el = document.querySelector('#notes [data-key="' + key + '"]');
+  if (el) el.remove();
+}
+function log(t) {
+  const el = $('log');
+  el.textContent += '\n' + t;
+  if (el.textContent.length > 8000) el.textContent = el.textContent.slice(-6000);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------------- 4) 버튼과 설정 ---------------- */
+function needConn() {
+  if (S.ready) return true;
+  note('info', '먼저 [아두이노 연결]을 눌러 연결하세요.', 'needconn');
+  setTimeout(() => dropNote('needconn'), 4000);
+  return false;
+}
+$('btnConnect').onclick = connect;
+$('btnTest').onclick = () => { if (S.ready) send('X'); else showWarning('테스트 (아두이노 없이)'); };
+$('btnFull').onclick = () => { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); };
+$('btnReset').onclick = () => { S.count = 0; $('vCount').textContent = 0; $('vLast').textContent = '없음'; };
+
+let calCountdown = null;
+$('btnCal').onclick = () => {
+  if (!needConn() || calCountdown) return;
+  $('btnCal').disabled = true;
+  let k = 3;
+  $('calText').textContent = '키보드에 손을 올려 두세요. ' + k + '초 뒤에 시작합니다…';
+  calCountdown = setInterval(() => {
+    k--;
+    if (k > 0) { $('calText').textContent = '키보드에 손을 올려 두세요. ' + k + '초 뒤에 시작합니다…'; return; }
+    clearInterval(calCountdown); calCountdown = null;
+    S.calibrating = true;
+    $('calText').textContent = '시작! 10초 동안 평소처럼 타자를 치세요 (스페이스바, 엔터 포함).';
+    send('K');
+    setTimeout(() => { if (S.calibrating) { S.calibrating = false; $('btnCal').disabled = false; } }, 15000);
+  }, 1000);
+};
+$('btnBase').onclick = () => {
+  if (!needConn()) return;
+  $('baseText').textContent = '센서에서 손을 떼세요… 1초 뒤에 잽니다.';
+  setTimeout(() => send('B'), 1000);
+};
+
+$('sMode').onchange = e => { S.mode = +e.target.value; $('modeHint').textContent = MODE_TEXT[S.mode]; send('D' + e.target.value); };
+$('sHits').onchange = e => { S.hits = +e.target.value; send('N' + e.target.value); };
+$('rW').oninput = e => { S.pressTh = +e.target.value; $('lW').textContent = S.pressTh; $('tPress').textContent = S.pressTh; setBar('Press', S.dispPress, S.pressTh); };
+$('rW').onchange = e => send('W' + e.target.value);
+$('rP').oninput = e => { S.shakeTh = +e.target.value; $('lP').textContent = S.shakeTh; $('tShake').textContent = S.shakeTh; setBar('Shake', S.dispShake, S.shakeTh); };
+$('rP').onchange = e => send('P' + e.target.value);
+$('rT').oninput = e => { $('lT').textContent = e.target.value; };
+$('rT').onchange = e => { S.holdMs = Math.round(e.target.value * 1000); $('holdSec').textContent = S.holdMs / 1000; showHold(0); send('T' + S.holdMs); };
+$('cBuzz').onchange = e => { S.muted = e.target.checked ? 0 : 1; send(e.target.checked ? 'M0' : 'M1'); };
+$('btnHold').addEventListener('pointerdown', softDown);
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('btnHold').addEventListener(ev, softUp));
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('disconnect', e => { if (S.port && e.target === S.port) disconnect(); });
+}
+syncControls();
+</script>
+</body>
+</html>
