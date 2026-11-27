@@ -48,9 +48,9 @@
 ## 👥 팀원 소개
 | 이름 | GitHub | 담당 역할 |
 | :--- | :--- | :--- |
-| 권보민 | [@아이디1](https://github.com/ppowwiuu) | 개선 아이디어 제안<br>• GitHub 레포지토리 구축, 기술 문서화 및 발표 자료 제작 |
-| 김도현 | [@아이디2](https://github.com/아이디2) | 프로젝트 핵심 기획 및 문제 해결 아이디어 도출<br>• 임베디드 시스템 아키텍처 및 센서 회로도 설계 |
-| 박서 | [@아이디3](https://github.com/아이디3) | 기능 고도화 아이디어 제안 및 센서 캘리브레이션<br>• 임베디드 하드웨어 프로토타이핑 및 물리 회로 결선 |
+| 권보민 | [@ppowwiuu](https://github.com/ppowwiuu) | 개선 아이디어 제안<br>• GitHub 레포지토리 구축, 기술 문서화 및 발표 자료 제작 |
+| 김도현 | [@rlaehgusrnerne](https://github.com/rlaehgusrnerne) | 프로젝트 핵심 기획 및 문제 해결 아이디어 도출<br>• 임베디드 시스템 아키텍처 및 센서 회로도 설계 |
+| 박서연 | [@seoyown](https://github.com/seoyown) | 기능 고도화 아이디어 제안 및 센서 캘리브레이션<br>• 임베디드 하드웨어 프로토타이핑 및 물리 회로 결선 |
 
 ---
 
