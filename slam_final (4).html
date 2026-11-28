@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>키보드 내려치기 감지 · 최종</title>
+<style>
+  :root{
+    --bg:#f3f4f1; --panel:#ffffff; --ink:#1c2321; --sub:#5c6763; --line:#d5dad6; --soft:#e8ebe8;
+    --accent:#0f6e5c; --warn:#c8261b; --amber:#a86300; --ok:#2f8f4e;
+    --font:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    --mono:"D2Coding",Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5}
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+         padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  h1{font-size:19px;margin:0}
+  .tagline{font-size:13px;color:var(--sub)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button,select,input[type=text],input[type=password]{font:inherit}
+  button{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.55;cursor:default}
+  button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .pill{padding:4px 10px;border-radius:999px;font-size:13px;border:1px solid var(--line);color:var(--sub);white-space:nowrap}
+  .pill.on{background:#e3f3e8;border-color:var(--ok);color:#1d6436}
+  .pill.wait{background:#fff4dc;border-color:#d9a43c;color:#7a5200}
+  .pill.bad{background:#fde9e7;border-color:#e3897f;color:#7d1a12}
+
+  #notes{max-width:1100px;margin:12px auto 0;padding:0 20px;display:flex;flex-direction:column;gap:8px}
+  #notes:empty{display:none}
+  .note{padding:10px 14px;border-radius:10px;border:1px solid;font-size:14px}
+  .note.warn{background:#fff6e2;border-color:#e0b45a;color:#5e4100}
+  .note.err{background:#fde9e7;border-color:#e3897f;color:#7d1a12}
+  .note.info{background:#e7f2ef;border-color:#9cc9bc;color:#174b40}
+
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;padding:16px 20px 28px;max-width:1100px;margin:0 auto}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .wide{grid-column:1/-1}
+  h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600}
+  h3{font-size:14px;margin:18px 0 8px;font-weight:600}
+  h3 small,h2 small{font-weight:400;color:var(--sub)}
+  .hint{font-size:13px;color:var(--sub);margin:8px 0 0}
+
+  .meter+.meter{margin-top:14px}
+  .mhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .mhead span{font-weight:700;font-size:15px}
+  .mhead small{font-weight:400;color:var(--sub);font-size:13px}
+  .mhead b{font-size:34px;font-variant-numeric:tabular-nums;line-height:1}
+  .mhead em{font-style:normal;font-size:13px;color:var(--sub);margin-left:6px}
+  .bar{height:18px;background:var(--soft);border-radius:9px;overflow:hidden;position:relative;margin-top:8px}
+  .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .06s linear}
+  .bar.over>i{background:var(--warn)}
+  .bar.good>i{background:var(--ok)}
+  .bar>b{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:var(--ink);box-shadow:0 0 0 1.5px #fff}
+
+  .big{font-size:52px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .unit{font-size:16px;color:var(--sub);margin-left:4px}
+
+  .hits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-height:120px}
+  .hits li{display:flex;align-items:center;gap:10px;font-size:14px;padding:6px 8px;border-radius:8px;background:#f7f8f6}
+  .hits li.empty{color:var(--sub);background:none;padding-left:0}
+  .hits time{font-family:var(--mono);font-size:12px;color:var(--sub)}
+  .hits .val{font-variant-numeric:tabular-nums;flex:1;white-space:nowrap}
+  .hits .val .hi{color:var(--warn);font-weight:700}
+  .badge{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub);white-space:nowrap}
+  .badge.strong{background:var(--warn);border-color:var(--warn);color:#fff;font-weight:700}
+  .badge.half{background:#fff4dc;border-color:#d9a43c;color:#7a5200}
+
+  .btncheck{display:flex;gap:12px}
+  .btncheck span{flex:1;text-align:center;padding:16px 0;border-radius:10px;border:2px solid var(--line);font-weight:700;color:var(--sub)}
+  .btncheck span.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px 28px}
+  label{display:block;font-size:14px;margin-top:12px}
+  label.check{display:flex;gap:8px;align-items:center}
+  input[type=range]{width:100%}
+  select,input[type=text],input[type=password]{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:4px}
+  details summary{cursor:pointer;color:var(--sub);font-size:14px}
+  #log{font-family:var(--mono);font-size:12.5px;height:220px;overflow:auto;background:#101614;color:#cfe6dc;
+       border-radius:8px;padding:10px;white-space:pre-wrap;margin:10px 0 0}
+
+  /* ---- 웹캠 ---- */
+  .camgrid{display:grid;grid-template-columns:minmax(240px,360px) 1fr;gap:20px;align-items:start}
+  @media (max-width:720px){.camgrid{grid-template-columns:1fr}}
+  .camview{position:relative;aspect-ratio:4/3;background:#1d2321;border-radius:10px;overflow:hidden}
+  .camview video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block}
+  .camoff{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cfd8d4;font-size:14px;text-align:center;padding:12px}
+  .shots{display:flex;flex-wrap:wrap;gap:10px;min-height:40px}
+  .shots a{display:flex;flex-direction:column;gap:4px;width:150px;text-decoration:none;color:var(--sub);font-size:12px}
+  .shots img{width:150px;aspect-ratio:4/3;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+
+  /* ---- "그러지 마세요" 경고 화면 ---- */
+  #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+           background:var(--warn);color:#fff;text-align:center;z-index:10;padding:20px;overflow:auto}
+  #overlay.show{display:flex;animation:shake .45s}
+  #overlay .msg{font-size:clamp(48px,13vw,170px);font-weight:900;letter-spacing:-.02em;line-height:1.05}
+  #overlay.media .msg{font-size:clamp(40px,9vw,120px)}
+  #overlay .sub{font-size:clamp(16px,2.6vw,30px);margin-top:12px;opacity:.92}
+  .ovmedia{display:none;gap:18px;margin-top:18px;flex-wrap:wrap;justify-content:center}
+  #overlay.media .ovmedia{display:flex}
+  .ovmedia figure{margin:0;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .ovmedia img,.ovmedia video{height:min(26vh,230px);aspect-ratio:4/3;object-fit:cover;border-radius:12px;border:3px solid rgba(255,255,255,.85);background:#2b0f0c}
+  .ovmedia video{transform:scaleX(-1)}
+  .ovmedia figcaption{font-size:16px;font-weight:700}
+  .smilebar{width:100%;height:12px;border-radius:6px;background:rgba(255,255,255,.28);overflow:hidden;position:relative}
+  .smilebar>i{display:block;height:100%;width:0;background:#fff}
+  .smilebar>b{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#2b0f0c}
+  #overlay .hold{margin-top:22px;width:min(560px,86vw);display:flex;flex-direction:column;gap:10px;align-items:center}
+  .btns{display:flex;gap:12px;width:100%}
+  .btns span{flex:1;padding:9px 0;border-radius:10px;border:2px solid rgba(255,255,255,.7);font-weight:700;font-size:17px}
+  .btns span.on{background:#fff;color:var(--warn)}
+  .holdbar{width:100%;height:22px;border-radius:11px;background:rgba(255,255,255,.28);overflow:hidden}
+  .holdbar>i{display:block;height:100%;width:0;background:#fff}
+  #holdText{font-size:19px;font-weight:600}
+  #btnHold{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6);touch-action:none;user-select:none;margin-top:4px;font-size:13px;opacity:.85}
+  /* ---- 표정 소감 (화면 맨 아래) ---- */
+  body.moodon{padding-bottom:58px}
+  #mood{position:fixed;left:0;right:0;bottom:0;display:none;align-items:center;gap:12px;padding:10px 20px;
+        background:#1c2321;color:#fff;font-size:16px;z-index:5;box-shadow:0 -2px 12px rgba(0,0,0,.18)}
+  #mood.show{display:flex}
+  .face{padding:3px 11px;border-radius:999px;font-size:13px;font-weight:700;background:#46524e;color:#fff;white-space:nowrap}
+  .face.happy{background:var(--ok)} .face.angry{background:var(--warn)} .face.sad{background:#3d6fb0} .face.neutral{background:#6b7773}
+  #mood .say{flex:1;min-width:0}
+  #ovMood{display:none;margin-top:18px;max-width:min(900px,92vw);font-size:clamp(16px,2.2vw,26px);font-weight:600;
+          background:rgba(0,0,0,.2);padding:8px 18px;border-radius:12px;gap:10px;align-items:center;justify-content:center}
+  #ovMood.show{display:flex}
+  #ovMood .face{background:#fff;color:var(--warn)}
+  .mini{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13px;margin-top:12px}
+  .mini .bar{height:10px;margin:0}
+  .mini b{font-variant-numeric:tabular-nums;font-weight:600}
+  code.copy{font-family:var(--mono);font-size:12.5px;background:var(--soft);padding:2px 6px;border-radius:6px;user-select:all;word-break:break-all}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-14px,6px)}40%{transform:translate(12px,-8px)}
+                   60%{transform:translate(-8px,4px)}80%{transform:translate(6px,-3px)}}
+  @media (prefers-reduced-motion:reduce){#overlay.show{animation:none}.bar>i{transition:none}}
+</style>
+</head>
+<body>
+
+<div id="overlay" role="alert" aria-live="assertive">
+  <div class="msg" id="ovMsg">그러지 마세요</div>
+  <div class="sub" id="ovSub"></div>
+  <div class="ovmedia">
+    <figure id="ovShotBox"><img id="ovShot" alt="내려친 순간 웹캠 사진"><figcaption>방금 당신 표정</figcaption></figure>
+    <figure id="ovLiveBox">
+      <video id="ovVideo" autoplay muted playsinline></video>
+      <div class="smilebar"><i id="ovSmileFill"></i><b id="ovSmileMark"></b></div>
+      <figcaption id="ovLiveCap">웃어 보세요</figcaption>
+    </figure>
+  </div>
+  <div class="hold">
+    <div class="btns"><span id="b0">웃음</span><span id="b1">왼쪽 버튼</span><span id="b2">오른쪽 버튼</span></div>
+    <div class="holdbar"><i id="holdFill"></i></div>
+    <div id="holdText">양쪽 버튼을 함께 3초 동안 누르고 있으면 사라집니다</div>
+    <button id="btnHold" type="button">비상 해제: 여기를 누르고 있기</button>
+  </div>
+  <div id="ovMood"><span class="face" id="ovFace"></span><span id="ovSay"></span></div>
+</div>
+
+<header>
+  <div>
+    <h1>키보드 내려치기 감지</h1>
+    <div class="tagline">압력 센서 + 진동 모듈 + 양쪽 버튼 + 웹캠(웃어야 풀림, 표정 소감) + 항상 위 경고 · 디스코드 알림</div>
+  </div>
+  <div class="row">
+    <span class="pill" id="helperPill" title="slam_helper.py">도우미 꺼짐</span>
+    <span class="pill" id="st">연결 안 됨</span>
+    <button class="primary" id="btnConnect" type="button">아두이노 연결</button>
+    <button id="btnTest" type="button">경고 테스트</button>
+    <button id="btnFull" type="button">전체 화면</button>
+  </div>
+</header>
+
+<div id="notes" aria-live="polite"></div>
+
+<main>
+  <section class="wide">
+    <h2>지금 센서 값</h2>
+    <div class="meter">
+      <div class="mhead"><span>압력 <small>갑자기 눌린 양 (손목·키보드 무게는 빼고)</small></span><div><b id="vPress">0</b><em>기준 <span id="tPress">80</span></em></div></div>
+      <div class="bar" id="barPressBox"><i id="barPress"></i><b id="markPress"></b></div>
+    </div>
+    <div class="meter">
+      <div class="mhead"><span>진동 <small>쾅 하는 충격</small></span><div><b id="vShake">0</b><em>기준 <span id="tShake">200</span></em></div></div>
+      <div class="bar" id="barShakeBox"><i id="barShake"></i><b id="markShake"></b></div>
+    </div>
+    <p class="hint" id="modeHint"></p>
+    <p class="hint">막대의 검은 선이 기준입니다. 막대가 빨갛게 바뀌면 기준을 넘은 것입니다.</p>
+    <p class="hint" id="baseText">가만히 있을 때 값: 연결하면 보입니다.</p>
+  </section>
+
+  <section class="wide">
+    <h2>웹캠 <small>웃어야 경고가 풀리고, 내려치면 사진을 찍습니다</small></h2>
+    <div class="camgrid">
+      <div class="camview">
+        <video id="camVideo" autoplay muted playsinline></video>
+        <div class="camoff" id="camOff">카메라 꺼짐<br>오른쪽의 [카메라 켜기]를 누르세요</div>
+      </div>
+      <div>
+        <div class="row">
+          <button class="primary" id="btnCam" type="button">카메라 켜기</button>
+          <span class="pill" id="camState">꺼짐</span>
+        </div>
+        <div class="meter" style="margin-top:12px">
+          <div class="mhead"><span>웃음 <small>입꼬리가 올라간 정도 (0~1)</small></span><div><b id="vSmile">-</b><em>기준 <span id="tSmile">0.55</span></em></div></div>
+          <div class="bar good" id="barSmileBox"><i id="barSmile"></i><b id="markSmile"></b></div>
+        </div>
+        <div class="mini" aria-label="표정 점수">
+          <span>화남</span><div class="bar" id="barAngryBox"><i id="barAngry"></i><b id="markAngry"></b></div><b id="vAngry">-</b>
+          <span>슬픔</span><div class="bar" id="barSadBox"><i id="barSad"></i><b id="markSad"></b></div><b id="vSad">-</b>
+        </div>
+        <p class="hint" style="margin-top:6px">지금 표정: <span class="face neutral" id="camFace">-</span></p>
+        <label for="rMood">화남·슬픔 감지 민감도: <b id="lMood">1.0</b> <small style="color:var(--sub)">(얼굴을 찡그려도 안 잡히면 올리고, 가만히 있는데 잡히면 내리기)</small></label>
+        <input type="range" id="rMood" min="0.5" max="2" step="0.1" value="1">
+        <label for="sUnlock">경고를 끄는 방법</label>
+        <select id="sUnlock">
+          <option value="smile_btn">웃으면서 양쪽 버튼을 함께 누르기 (추천)</option>
+          <option value="smile">웃기만 하면</option>
+          <option value="either">웃기 또는 양쪽 버튼</option>
+          <option value="btn">양쪽 버튼만 (카메라 없이)</option>
+        </select>
+        <label for="rSmile">웃음 기준: <b id="lSmile">0.55</b> <small style="color:var(--sub)">(활짝 웃을 때 숫자보다 조금 낮게)</small></label>
+        <input type="range" id="rSmile" min="0.2" max="0.9" step="0.05" value="0.55">
+        <label for="rSmileT">"웃기만", "웃기 또는 버튼"일 때 웃고 있어야 하는 시간: <b id="lSmileT">2</b>초</label>
+        <input type="range" id="rSmileT" min="1" max="5" step="0.5" value="2">
+        <label class="check" for="cShot"><input type="checkbox" id="cShot" checked> 내려치면 웹캠으로 사진 찍기</label>
+        <p class="hint" id="camHint">카메라를 켜면 크롬이 카메라 허용을 묻습니다. 얼굴 인식 도구는 처음에 인터넷에서 받아 옵니다(몇 MB, 10초 안팎).</p>
+      </div>
+    </div>
+    <h3>찍힌 표정 <small>사진은 이 화면 안에만 있고 어디로도 보내지 않습니다. 창을 닫으면 사라지니, 남기려면 사진을 눌러 저장하세요.</small></h3>
+    <div class="shots" id="shots"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnSaveAll" type="button">사진 모두 저장</button>
+      <button id="btnClearShots" type="button">사진 지우기</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>방금 친 기록 <small>(빨간 숫자 = 기준을 넘음)</small></h2>
+    <ol class="hits" id="hits"><li class="empty">아직 없음. 연결한 뒤 키보드를 쳐 보세요.</li></ol>
+  </section>
+
+  <section>
+    <h2>경고 횟수</h2>
+    <div><span class="big" id="vCount">0</span><span class="unit">번</span></div>
+    <p class="hint">마지막: <span id="vLast">없음</span></p>
+    <p class="hint" id="strongText"></p>
+    <div class="row" style="margin-top:10px"><button id="btnReset" type="button">횟수 지우기</button></div>
+  </section>
+
+  <section>
+    <h2>버튼 확인</h2>
+    <div class="btncheck"><span id="c1">왼쪽</span><span id="c2">오른쪽</span></div>
+    <p class="hint" id="btnHint">버튼을 누르면 여기에 불이 들어옵니다.</p>
+  </section>
+
+  <section class="wide">
+    <h2>설정 <small>(감지 설정은 아두이노에 바로 저장됩니다)</small></h2>
+    <div class="grid2">
+      <div>
+        <label for="sMode">감지 방식</label>
+        <select id="sMode">
+          <option value="3">둘 다 세야 (추천: 타자와 가장 확실하게 구분)</option>
+          <option value="0">압력만</option>
+          <option value="1">진동만</option>
+          <option value="2">둘 중 하나라도 세면 (가장 예민함)</option>
+        </select>
+        <label for="rW">압력 기준: <b id="lW">80</b></label>
+        <input type="range" id="rW" min="5" max="600" step="1" value="80">
+        <label for="rP">진동 기준: <b id="lP">200</b></label>
+        <input type="range" id="rP" min="5" max="1000" step="1" value="200">
+        <div class="row" style="margin-top:14px">
+          <button id="btnCal" type="button">타자 보정 (10초)</button>
+          <button id="btnBase" type="button">기준 다시 재기</button>
+        </div>
+        <p class="hint" id="calText">키보드에 손을 올리고 [타자 보정]을 누르세요. 3초 뒤에 시작하면 10초 동안 평소처럼 타자를 치면 됩니다. 기준값이 자동으로 정해집니다.</p>
+      </div>
+      <div>
+        <label for="sHits">몇 번 세게 쳐야 경고</label>
+        <select id="sHits">
+          <option value="1">1번</option>
+          <option value="2">1.5초 안에 2번</option>
+          <option value="3">1.5초 안에 3번</option>
+        </select>
+        <label for="rT">경고 끄기: 버튼을 누르고 있어야 하는 시간 <b id="lT">3</b>초</label>
+        <input type="range" id="rT" min="1" max="10" step="0.5" value="3">
+        <label for="tMsg">경고 문구</label>
+        <input type="text" id="tMsg" value="그러지 마세요">
+        <label class="check" for="cBuzz"><input type="checkbox" id="cBuzz" checked> 아두이노 부저 소리 켜기</label>
+        <label class="check" for="cVoice"><input type="checkbox" id="cVoice"> 경고 문구를 소리로도 읽기</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="wide" id="helperSec">
+    <h2>도우미 <small>다른 창 위에 경고 띄우기 · 디스코드 알림 · 카카오톡 나에게 보내기 (slam_helper.py 로 열었을 때만)</small></h2>
+    <p class="hint" id="helperHint" style="margin-top:0"></p>
+    <label class="check" for="cTop"><input type="checkbox" id="cTop" checked> 경고를 다른 모든 창보다 앞에 띄우기 (항상 위)</label>
+    <div class="grid2">
+      <div>
+        <h3>디스코드 알림 <small id="dcState"></small></h3>
+        <label for="tHook">웹훅 URL <small style="color:var(--sub)">(한 번 저장하면 비워 둬도 유지)</small></label>
+        <input type="password" id="tHook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" spellcheck="false">
+        <label for="tName">알림에 나올 내 이름</label>
+        <input type="text" id="tName" placeholder="예: 도현" maxlength="32">
+        <label for="sCool">알림 사이 최소 간격 <small style="color:var(--sub)">(그 사이 내려친 횟수는 다음 알림에 합쳐서)</small></label>
+        <select id="sCool">
+          <option value="0">간격 없음</option>
+          <option value="20">20초</option>
+          <option value="60">1분</option>
+          <option value="300">5분</option>
+        </select>
+      </div>
+      <div>
+        <label class="check" for="cPhoto"><input type="checkbox" id="cPhoto"> 내려친 순간 웹캠 사진도 같이 보내기</label>
+        <p class="hint">사진이 디스코드 채널에 올라가 채널 사람 모두가 봅니다. 원할 때만 켜세요.</p>
+        <label class="check" for="cHere"><input type="checkbox" id="cHere"> @here 로 채널 사람들에게 알림 울리기</label>
+        <div class="row" style="margin-top:14px">
+          <button class="primary" id="btnDcSave" type="button">저장</button>
+          <button id="btnDcTest" type="button">테스트 메시지 보내기</button>
+          <button id="btnDcClear" type="button">웹훅 지우기</button>
+        </div>
+        <p class="hint" id="dcResult"></p>
+      </div>
+    </div>
+    <h3>카카오톡 나에게 보내기 <small id="kkState"></small></h3>
+    <p class="hint" style="margin-top:0">내려치면 내 카톡 '나와의 채팅'으로 사진과 함께 보냅니다. 친구들은 못 받고, 카톡 알림도 울리지 않습니다(카카오 정책). 처음 한 번 카카오디벨로퍼스 설정이 필요해요(안내서 참고).</p>
+    <div class="grid2">
+      <div>
+        <label for="tKakaoKey">REST API 키 <small style="color:var(--sub)">(카카오디벨로퍼스 [앱 키])</small></label>
+        <input type="password" id="tKakaoKey" autocomplete="off" spellcheck="false" placeholder="한 번 저장하면 비워 둬도 유지">
+        <label for="tKakaoSecret">클라이언트 시크릿 <small style="color:var(--sub)">(카카오디벨로퍼스에서 "사용함"일 때만)</small></label>
+        <input type="password" id="tKakaoSecret" autocomplete="off" spellcheck="false" placeholder="사용 안 하면 비워 두기">
+        <p class="hint">카카오디벨로퍼스에 그대로 등록할 주소<br>
+          리다이렉트 URI: <code class="copy" id="kkRedirect">http://localhost:8765/kakao/callback</code><br>
+          웹 도메인: <code class="copy" id="kkSite">http://localhost:8765</code></p>
+      </div>
+      <div>
+        <label class="check" for="cKakaoOn"><input type="checkbox" id="cKakaoOn" checked> 내려치면 내 카톡으로 보내기</label>
+        <label class="check" for="cKakaoPhoto"><input type="checkbox" id="cKakaoPhoto" checked> 내려친 순간 사진도 같이</label>
+        <div class="row" style="margin-top:14px">
+          <button id="btnKakaoSave" type="button">키 저장</button>
+          <button class="primary" id="btnKakaoLogin" type="button">카카오 로그인</button>
+          <button id="btnKakaoTest" type="button">나에게 테스트 보내기</button>
+          <button id="btnKakaoLogout" type="button">로그아웃</button>
+        </div>
+        <p class="hint" id="kkResult"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wide">
+    <details>
+      <summary>아두이노가 보낸 글자 (문제가 생겼을 때 열어 보기)</summary>
+      <pre id="log">아직 연결하지 않았습니다. 위의 [아두이노 연결]을 누르세요.
+아두이노 없이도 [경고 테스트]로 경고 화면을 볼 수 있습니다.</pre>
+    </details>
+  </section>
+</main>
+
+<div id="mood" aria-live="polite"><span class="face" id="moodFace">-</span><span class="say" id="moodSay"></span></div>
+
+<script>
+/* =====================================================================
+   키보드 내려치기 감지 · 최종 화면 (웹캠: 웃어야 풀림, 내려치면 사진, 표정 소감)
+   아두이노(slam_final.ino)와 USB로 연결해서 쓰는 화면입니다. (크롬 / 엣지)
+   slam_helper.py 로 열면 (http://127.0.0.1:8765) 항상 위 경고 창과 디스코드 알림이 더해집니다.
+   파일로 바로 열면 (file://) 그 두 가지 없이 전처럼 동작합니다.
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const two = v => String(v).padStart(2, '0');
+const clock = () => { const d = new Date(); return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()); };
+const stamp = () => { const d = new Date(); return d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '_' + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds()); };
+
+const S = {
+  port: null, writer: null, reader: null, readPipe: null,
+  connected: false, ready: false, helloTimer: null, fw: 0, sentU: null,
+  pressTh: 80, shakeTh: 200, holdMs: 3000, hits: 1, mode: 3, muted: 0,
+  dispPress: 0, dispShake: 0, calibrating: false, count: 0,
+  btnL: false, btnR: false, ardLocked: false,
+  smileTh: 0.55, smileHoldMs: 2000, shots: [], moodSens: 1
+};
+const CAM = { stream: null, detector: null, loading: null, raf: 0, lastVideoTime: -1, lastDetT: 0, face: false, smile: 0, failed: false, errCount: 0, cpuRetry: false,
+              lastTick: 0, lastRun: 0, readyT: 0, wasStale: false };
+const UN = { condStart: 0, btnHoldMs: 0, btnStart: 0 };          // 경고 해제 진행 상황
+const MODE_TEXT = {
+  0: '지금 방식: 압력만. 압력이 기준선을 넘으면 경고합니다. 손목을 갑자기 올려도 울릴 수 있어요.',
+  1: '지금 방식: 진동만. 진동이 기준선을 넘으면 경고합니다. 책상을 치거나 키를 아주 세게 쳐도 울릴 수 있어요.',
+  2: '지금 방식: 둘 중 하나. 압력이나 진동 중 하나만 넘어도 경고합니다. 가장 예민해요.',
+  3: '지금 방식: 둘 다 세야. 압력과 진동이 동시에 기준선을 넘어야 경고합니다. 타자는 보통 둘 중 하나만 커서 경고가 안 떠요.'
+};
+
+/* ---------------- 1) 아두이노와 연결 (Web Serial) ---------------- */
+async function connect() {
+  if (S.connected) { await disconnect(); return; }
+  if (!('serial' in navigator)) {
+    note('err', '이 브라우저는 아두이노 연결을 지원하지 않습니다. 크롬이나 엣지로 이 파일을 여세요.', 'browser');
+    return;
+  }
+  let port;
+  try { port = await navigator.serial.requestPort(); }
+  catch (e) { log('포트를 고르지 않았습니다.'); return; }
+  await openPort(port, false);
+}
+/* 전에 허락한 아두이노가 하나뿐이면 화면을 열 때 자동으로 연결 (크롬을 닫았다 열어도 버튼이 바로 동작) */
+async function autoConnect() {
+  if (!('serial' in navigator) || S.connected) return;
+  try {
+    const ports = await navigator.serial.getPorts();
+    if (ports.length === 1) { log('전에 연결했던 아두이노에 자동으로 연결합니다.'); await openPort(ports[0], true); }
+  } catch (e) {}
+}
+async function openPort(port, auto) {
+  try {
+    S.port = port;
+    await S.port.open({ baudRate: 115200 });
+  } catch (e) {
+    S.port = null;
+    if (auto) { log('자동 연결 실패: ' + (e && e.message ? e.message : e) + ' · [아두이노 연결]을 누르세요.'); return; }
+    note('err', '연결 실패: ' + (e && e.message ? e.message : e) +
+      ' · 아두이노 IDE의 시리얼 모니터가 열려 있으면 닫고 다시 누르세요.', 'connect');
+    return;
+  }
+  dropNote('connect'); dropNote('browser');
+  S.writer = S.port.writable.getWriter();
+  S.connected = true; S.ready = false; S.sentU = null;
+  setStatus('wait');
+  log('연결했습니다. 아두이노가 다시 시작합니다. 1초 동안 센서에서 손을 떼세요.');
+  clearTimeout(S.helloTimer);
+  S.helloTimer = setTimeout(() => {
+    if (S.connected && !S.ready) note('warn', '아두이노에서 답이 없습니다. 최종 코드 slam_final.ino 가 업로드되어 있는지 확인하고, USB를 다시 꽂은 뒤 연결해 보세요.', 'nohello');
+  }, 5000);
+  readLoop();
+}
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  S.readPipe = S.port.readable.pipeTo(decoder.writable).catch(() => {});
+  S.reader = decoder.readable.getReader();
+  let buf = '';
+  try {
+    for (;;) {
+      const { value, done } = await S.reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (line) { try { handleLine(line); } catch (e) { log('화면 오류: ' + e.message); } }
+      }
+      if (buf.length > 2000) buf = '';
+    }
+  } catch (e) {
+    if (S.connected) log('연결이 끊겼습니다: ' + e.message);
+  }
+  if (S.connected) await disconnect();
+}
+
+async function disconnect() {
+  S.connected = false; S.ready = false; S.sentU = null; S.ardLocked = false;
+  clearTimeout(S.helloTimer);
+  try { if (S.reader) await S.reader.cancel(); } catch (e) {}
+  try { if (S.readPipe) await S.readPipe; } catch (e) {}
+  try { if (S.writer) S.writer.releaseLock(); } catch (e) {}
+  try { if (S.port) await S.port.close(); } catch (e) {}
+  S.port = null; S.writer = null; S.reader = null; S.readPipe = null;
+  S.btnL = S.btnR = false; showButtons(false, false);
+  setStatus('off');
+  log('연결을 끊었습니다.');
+}
+
+async function send(cmd) {
+  if (!S.writer) return false;
+  try { await S.writer.write(new TextEncoder().encode(cmd + '\n')); return true; }
+  catch (e) { log('보내기 실패: ' + e.message); return false; }
+}
+
+/* ---------------- 2) 아두이노가 보낸 글자 해석 ---------------- */
+function handleLine(line) {
+  const p = line.split(',');
+  const n = i => { const v = parseInt(p[i], 10); return isNaN(v) ? 0 : v; };
+  switch (p[0]) {
+    case 'V':       showLive(n(1), n(2)); serialTick(); return;         // V,압력,진동,압력원래값
+    case 'HIT':     addHit(n(1), n(2), p[3] === '1'); return;           // HIT,압력,진동,강한충격
+    case 'BTN':                                                         // BTN,왼쪽,오른쪽
+      S.btnL = p[1] === '1'; S.btnR = p[2] === '1';
+      UN.btnStart = S.btnL && S.btnR ? (UN.btnStart || Date.now()) : 0;
+      showButtons(S.btnL, S.btnR); evaluateUnlock(); return;
+    case 'HOLD':    UN.btnHoldMs = n(1); evaluateUnlock(); return;      // HOLD,밀리초
+    case 'STRONG':  showStrong(n(1), n(2)); return;
+    case 'CAL':     $('calText').textContent = '보정 중… 평소처럼 타자를 계속 치세요 (' + n(1) + '초 남음)'; return;
+    case 'HELLO':
+      S.ready = false; S.sentU = null; S.ardLocked = false; S.fw = n(2); setStatus('wait'); dropNote('wrongsketch');
+      log(line + '  ← 아두이노 시작. 센서에서 손을 떼세요');
+      return;
+    case 'BASE':    showBase(n(1), n(2), n(3)); log(line); return;
+    case 'CFG':     applyCfg(p); log(line); return;
+    case 'READY':
+      S.ready = true; setStatus('on'); clearTimeout(S.helloTimer); dropNote('nohello');
+      log(line + '  ← 준비 끝');
+      applyUnlockMode();
+      return;
+    case 'SLAM':    S.ardLocked = true; onSlam(n(1), n(2), p[4] === '1'); log(line); return; // SLAM,압력,진동,누적,테스트
+    case 'CLEAR':   S.ardLocked = false; hideWarning(); log(line); return;
+    case 'CALDONE': onCalDone(n(1), n(2), n(3), n(4), n(5)); log(line); return;
+    default:
+      log(line);
+      if (!S.ready && /Baseline|Typing vs Slam|Simple typing|normal value|Commands:/i.test(line)) {
+        note('warn', '지금 아두이노에는 테스트 코드가 올라가 있어요. slam_final.ino 를 업로드한 뒤 다시 연결하세요.', 'wrongsketch');
+      }
+  }
+}
+
+/* ---------------- 3) 센서 값 표시 ---------------- */
+function scaleFor(th) { return Math.min(1023, Math.max(100, th * 2)); }
+function setBar(name, v, th) {
+  const sc = scaleFor(th);
+  $('bar' + name).style.width = Math.min(100, v / sc * 100) + '%';
+  $('mark' + name).style.left = Math.min(100, th / sc * 100) + '%';
+  $('bar' + name + 'Box').classList.toggle('over', v >= th);
+  $('v' + name).textContent = Math.round(v);
+}
+function showLive(press, shake) {
+  S.dispPress = Math.max(press, S.dispPress * 0.8);
+  S.dispShake = Math.max(shake, S.dispShake * 0.8);
+  if (S.dispPress < 1) S.dispPress = 0;
+  if (S.dispShake < 1) S.dispShake = 0;
+  setBar('Press', S.dispPress, S.pressTh);
+  setBar('Shake', S.dispShake, S.shakeTh);
+}
+function showBase(fsrRaw, shakeRest, shakeNoise) {
+  $('baseText').textContent = '가만히 있을 때 값: 압력 센서 ' + fsrRaw + ' / 1023, 진동 ' + shakeRest + ' (흔들림 ' + shakeNoise + ')';
+  if (fsrRaw > 850) note('warn', '압력 센서가 가만히 있어도 ' + fsrRaw + '만큼 눌려 있어요. 1000 근처에서 꽉 차기 때문에 내려쳐도 잘 안 올라갑니다. 동전을 빼거나 센서에 걸리는 무게를 줄이세요.', 'fsrhigh');
+  else dropNote('fsrhigh');
+  if (fsrRaw < 5) note('info', '압력 센서가 눌리지 않은 상태(0)예요. 키보드 밑에 센서가 닿아 있는지, 배선(5V, A1, 10kΩ)이 맞는지 확인하세요.', 'fsrzero');
+  else dropNote('fsrzero');
+  if (shakeNoise > 15) note('warn', '진동 값이 가만히 있어도 흔들려요(' + shakeNoise + '). 진동 모듈 S→A0, +→5V, −→GND 연결을 확인하거나, 손을 떼고 [기준 다시 재기]를 누르세요.', 'shakenoise');
+  else dropNote('shakenoise');
+}
+function applyCfg(p) {
+  const g = i => parseInt(p[i], 10);
+  if (!isNaN(g(1))) S.pressTh = g(1);
+  if (!isNaN(g(2))) S.shakeTh = g(2);
+  if (!isNaN(g(3))) S.holdMs = g(3);
+  if (!isNaN(g(4))) S.hits = g(4);
+  if (!isNaN(g(5))) S.mode = g(5);
+  if (!isNaN(g(6))) S.muted = g(6);
+  syncControls();
+}
+function syncControls() {
+  $('rW').value = S.pressTh; $('lW').textContent = S.pressTh; $('tPress').textContent = S.pressTh;
+  $('rP').value = S.shakeTh; $('lP').textContent = S.shakeTh; $('tShake').textContent = S.shakeTh;
+  $('sMode').value = String(S.mode);
+  $('sHits').value = String(S.hits);
+  $('rT').value = S.holdMs / 1000; $('lT').textContent = S.holdMs / 1000;
+  $('cBuzz').checked = !S.muted;
+  $('modeHint').textContent = MODE_TEXT[S.mode] || '';
+  setBar('Press', S.dispPress, S.pressTh);
+  setBar('Shake', S.dispShake, S.shakeTh);
+  updateUnlockTexts();
+}
+
+function addHit(press, shake, strong) {
+  const list = $('hits');
+  const empty = list.querySelector('.empty');
+  if (empty) empty.remove();
+  const pOver = press >= S.pressTh, sOver = shake >= S.shakeTh;
+  const li = document.createElement('li');
+  const t = document.createElement('time');
+  t.textContent = clock();
+  const val = document.createElement('span');
+  val.className = 'val';
+  val.innerHTML = '압력 <span class="' + (pOver ? 'hi' : '') + '">' + press + '</span> · 진동 <span class="' + (sOver ? 'hi' : '') + '">' + shake + '</span>';
+  const badge = document.createElement('span');
+  if (strong) { badge.className = 'badge strong'; badge.textContent = '강한 충격'; }
+  else if (S.calibrating) { badge.className = 'badge'; badge.textContent = '보정 중'; }
+  else if (pOver || sOver) { badge.className = 'badge half'; badge.textContent = pOver && sOver ? '둘 다 넘음' : (pOver ? '압력만 넘음' : '진동만 넘음'); }
+  else { badge.className = 'badge'; badge.textContent = '타자'; }
+  li.append(t, val, badge);
+  list.prepend(li);
+  while (list.children.length > 8) list.lastElementChild.remove();
+}
+
+let strongTimer = null;
+function showStrong(k, need) {
+  $('strongText').textContent = '세게 친 횟수 ' + k + ' / ' + need + ' (1.5초 안에 ' + need + '번이면 경고)';
+  clearTimeout(strongTimer);
+  strongTimer = setTimeout(() => { $('strongText').textContent = ''; }, 1600);
+}
+
+/* ---------------- 4) 경고 화면 ---------------- */
+function onSlam(press, shake, test) {
+  S.count++;
+  $('vCount').textContent = S.count;
+  $('vLast').textContent = clock() + (test ? ' (테스트)' : ' · 압력 ' + press + ', 진동 ' + shake);
+  const shot = captureShot(test ? '테스트' : S.count + '번째 경고');
+  showWarning(test ? '테스트 경고' : '오늘 ' + S.count + '번째', shot);
+  helperSlam(press, shake, test, shot);
+}
+
+function showWarning(sub, shot) {
+  const msg = $('tMsg').value.trim() || '그러지 마세요';
+  $('ovMsg').textContent = msg;
+  $('ovSub').textContent = sub || '';
+  const ov = $('overlay');
+  const live = !!CAM.stream;
+  $('ovShotBox').style.display = shot ? '' : 'none';
+  if (shot) $('ovShot').src = shot.url;
+  $('ovLiveBox').style.display = live ? '' : 'none';
+  ov.classList.toggle('media', !!shot || live);
+  if (live) { const v = $('ovVideo'); if (v.srcObject !== CAM.stream) v.srcObject = CAM.stream; v.play().catch(() => {}); }
+  UN.condStart = 0; UN.btnHoldMs = 0;
+  ov.classList.remove('show'); void ov.offsetWidth;   // 흔들림을 매번 다시
+  ov.classList.add('show');                           // 정해진 방법으로만 사라짐
+  newComment();
+  evaluateUnlock();
+  if ($('cVoice').checked && 'speechSynthesis' in window) {
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg); u.lang = 'ko-KR'; speechSynthesis.speak(u); } catch (e) {}
+  }
+}
+function hideWarning() {
+  const was = overlayOn();
+  $('overlay').classList.remove('show');
+  softUp();
+  UN.condStart = 0; UN.btnHoldMs = 0;
+  setProgress(0, baseHoldText(effectiveMode()));
+  if (HELPER.on) helperFetch('/api/clear', {});
+  if (was) newComment();
+}
+function overlayOn() { return $('overlay').classList.contains('show'); }
+function showButtons(left, right) {
+  $('b1').classList.toggle('on', left);  $('b2').classList.toggle('on', right);
+  $('c1').classList.toggle('on', left);  $('c2').classList.toggle('on', right);
+}
+function setProgress(frac, text) {
+  $('holdFill').style.width = Math.max(0, Math.min(100, frac * 100)) + '%';
+  $('holdText').textContent = text;
+}
+const left = ms => Math.max(0, ms / 1000).toFixed(1) + '초 남음';
+
+/* ---------------- 5) 경고 끄는 방법 (웃음 / 버튼) ---------------- */
+function smileReady() { return !!(CAM.stream && CAM.detector); }
+/* 얼굴 인식이 3초 넘게 한 번도 안 돌았음 = 카메라 화면이 멈춤 (크롬 최소화 등) */
+function camStale() { return smileReady() && Date.now() - Math.max(CAM.lastDetT, CAM.readyT) > 3000; }
+const freshMs = () => document.hidden ? 2500 : 700;
+function effectiveMode() {
+  const m = $('sUnlock').value;
+  return (m !== 'btn' && (!smileReady() || camStale())) ? 'btn' : m;
+}
+function baseHoldText(m) {
+  const b = S.holdMs / 1000, s = S.smileHoldMs / 1000;
+  if (m === 'smile_btn') return '웃으면서 양쪽 버튼을 함께 ' + b + '초 누르고 있으면 사라집니다';
+  if (m === 'smile') return '카메라를 보고 ' + s + '초 동안 웃으면 사라집니다';
+  if (m === 'either') return s + '초 동안 웃거나, 양쪽 버튼을 함께 ' + b + '초 누르면 사라집니다';
+  return '양쪽 버튼을 함께 ' + b + '초 동안 누르고 있으면 사라집니다';
+}
+function updateUnlockTexts() {
+  const m = effectiveMode();
+  $('b0').style.display = (m === 'btn') ? 'none' : '';
+  $('b1').style.display = $('b2').style.display = (m === 'smile') ? 'none' : '';
+  $('btnHint').textContent = '버튼을 누르면 여기에 불이 들어옵니다. 지금 경고 끄는 방법: ' + baseHoldText(m).replace('사라집니다', '꺼집니다');
+  if (!overlayOn()) setProgress(0, baseHoldText(m));
+}
+function applyUnlockMode() {
+  const chosen = $('sUnlock').value, m = effectiveMode();
+  const wantU = (m === 'smile' || m === 'smile_btn') ? 1 : 0;
+  if (S.ready && S.sentU !== wantU) { S.sentU = wantU; send('U' + wantU); }
+  if (chosen !== 'btn' && m === 'btn' && !(CAM.stream && CAM.failed)) {
+    note('info', CAM.stream
+      ? (smileReady() ? '카메라 화면이 멈춰서(크롬 창을 최소화하면 이렇게 돼요) 지금은 버튼으로 경고를 끕니다. 크롬 창을 다시 띄우면 웃음 해제로 돌아갑니다.'
+                      : '얼굴 인식을 준비하는 중이라 지금은 버튼으로 경고를 끕니다. 준비되면 자동으로 웃음 해제로 바뀝니다.')
+      : '카메라가 꺼져 있어서 지금은 버튼으로 경고를 끕니다. 웹캠 칸의 [카메라 켜기]를 누르면 웃음 해제가 켜집니다.', 'unlockfb');
+  } else dropNote('unlockfb');
+  if (S.ready && wantU && S.fw && S.fw < 4) {
+    note('warn', '아두이노 코드가 이전 버전이라 버튼만 눌러도 경고가 꺼질 수 있어요. 웃음 해제를 쓰려면 새 slam_final.ino 를 업로드하세요.', 'oldfw');
+  } else dropNote('oldfw');
+  updateUnlockTexts();
+}
+function isSmiling() {
+  return smileReady() && CAM.face && (Date.now() - CAM.lastDetT < freshMs()) && CAM.smile >= S.smileTh;
+}
+function btnHeldMs(now) {
+  if (S.ardLocked) return UN.btnHoldMs;
+  return S.ready && UN.btnStart ? now - UN.btnStart : 0;
+}
+function evaluateUnlock() {
+  if (!overlayOn()) { UN.condStart = 0; return; }
+  const m = effectiveMode(), now = Date.now();
+  const smiling = isSmiling(), both = S.btnL && S.btnR;
+  $('b0').classList.toggle('on', smiling);
+  if (softTimer) return;                               // 비상 해제를 누르는 중
+  let frac = 0, text = baseHoldText(m);
+  const bh = btnHeldMs(now);
+  if ((m === 'btn' || m === 'either') && !S.ardLocked && bh >= S.holdMs) { unlockNow(); return; }
+  if (m === 'btn') {
+    frac = bh / S.holdMs;
+    if (bh > 0) text = '계속 누르고 계세요… ' + left(S.holdMs - bh);
+  } else {
+    const need = m === 'smile_btn' ? S.holdMs : S.smileHoldMs;
+    const cond = m === 'smile_btn' ? (smiling && both) : smiling;
+    if (cond) { if (!UN.condStart) UN.condStart = now; } else UN.condStart = 0;
+    const held = UN.condStart ? now - UN.condStart : 0;
+    if (held >= need) { unlockNow(); return; }
+    frac = held / need;
+    if (held > 0) text = (m === 'smile_btn' ? '좋아요! 계속 웃으면서 누르세요… ' : '좋아요! 계속 웃으세요… ') + left(need - held);
+    else if (!CAM.face) text = '얼굴이 카메라에 보이게 해 주세요';
+    else if (m === 'smile_btn' && both) text = '버튼은 눌렸어요. 이제 웃어야 풀려요!';
+    else if (m === 'smile_btn' && smiling) text = '웃음 확인! 양쪽 버튼도 함께 누르세요';
+    if (m === 'either' && bh > 0 && bh / S.holdMs > frac) {
+      frac = bh / S.holdMs;
+      text = '계속 누르고 계세요… ' + left(S.holdMs - bh);
+    }
+  }
+  setProgress(frac, text);
+}
+function unlockNow() {
+  UN.condStart = 0;
+  if (S.ready) send('C');                              // 아두이노도 경고를 끔 (CLEAR 가 돌아옴)
+  hideWarning();
+}
+
+/* 비상 해제: 화면 버튼을 정해진 시간 동안 누르고 있기 */
+let softStart = 0, softTimer = null;
+function softDown(e) {
+  e.preventDefault();
+  if (softTimer) return;
+  softStart = Date.now();
+  softTimer = setInterval(() => {
+    const held = Date.now() - softStart;
+    if (held >= S.holdMs) { softUp(); unlockNow(); }
+    else setProgress(held / S.holdMs, '비상 해제 중… ' + left(S.holdMs - held));
+  }, 50);
+}
+function softUp() {
+  if (!softTimer) return;
+  clearInterval(softTimer); softTimer = null;
+  evaluateUnlock();
+}
+
+/* ---------------- 6) 웹캠 + 얼굴 인식 ---------------- */
+const MP_CANDIDATES = [
+  { mod: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs',
+    wasm: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm' },
+  { mod: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs',
+    wasm: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm' }
+];
+const MP_MODELS = [
+  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+  'https://huggingface.co/litert-community/MediaPipe-FaceLandmarker/resolve/main/face_landmarker.task'
+];
+/* 얼굴 근육 점수(블렌드셰이프 52개) -> 웃음 / 화남 / 슬픔 (각각 0~1)
+   웃음: 입꼬리 올라감 · 화남: 눈썹 내려옴 + 코 찡그림 + 입술 꽉 · 슬픔: 입꼬리 내려감 + 눈썹 안쪽 올라감 + 아랫입술 올라감 */
+function exprFromBlendshapes(g) {
+  const v = k => g[k] || 0, avg = (a, b) => (v(a) + v(b)) / 2, cl = x => Math.max(0, Math.min(1, x));
+  const smile = avg('mouthSmileLeft', 'mouthSmileRight');
+  const angry = cl(avg('browDownLeft', 'browDownRight') * 0.8 + avg('noseSneerLeft', 'noseSneerRight') * 0.6
+                 + avg('mouthPressLeft', 'mouthPressRight') * 0.3 - smile * 0.5);
+  const sad = cl(avg('mouthFrownLeft', 'mouthFrownRight') * 1.3 + v('browInnerUp') * 0.45 + v('mouthShrugLower') * 0.35
+               - smile * 0.6 - avg('browDownLeft', 'browDownRight') * 0.2);
+  return { smile, angry, sad };
+}
+async function loadDetector(cpuOnly) {
+  if (window.__testSmileDetector) return window.__testSmileDetector;   // 테스트용
+  let lastErr = null;
+  for (const c of MP_CANDIDATES) {
+    let vision;
+    try { vision = await import(c.mod); } catch (e) { lastErr = e; continue; }
+    let fileset;
+    try { fileset = await vision.FilesetResolver.forVisionTasks(c.wasm); } catch (e) { lastErr = e; continue; }
+    for (const model of MP_MODELS) {
+      for (const delegate of (cpuOnly ? ['CPU'] : ['GPU', 'CPU'])) {
+        try {
+          const lm = await vision.FaceLandmarker.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: model, delegate },
+            runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true
+          });
+          return {
+            detect(video, t) {
+              const r = lm.detectForVideo(video, t);
+              const b = r && r.faceBlendshapes && r.faceBlendshapes[0];
+              if (!b) return { face: false, smile: 0, angry: 0, sad: 0 };
+              const g = {};
+              for (const k of b.categories) g[k.categoryName] = k.score;
+              return Object.assign({ face: true }, exprFromBlendshapes(g));
+            }
+          };
+        } catch (e) { lastErr = e; }
+      }
+    }
+  }
+  throw lastErr || new Error('unknown');
+}
+
+async function startCamera() {
+  if (CAM.stream) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camState('bad', '카메라 사용 불가');
+    note('err', '이 브라우저에서는 카메라를 쓸 수 없습니다. 크롬이나 엣지로 여세요.', 'cam');
+    return;
+  }
+  $('btnCam').disabled = true;
+  camState('wait', '카메라 켜는 중…');
+  try {
+    CAM.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+  } catch (e) {
+    CAM.stream = null;
+    $('btnCam').disabled = false;
+    const name = e && e.name;
+    const why = name === 'NotAllowedError' ? '카메라 사용을 허용해 주세요. 주소창 왼쪽의 아이콘을 눌러 카메라를 "허용"으로 바꾼 뒤 다시 누르세요.'
+      : name === 'NotFoundError' ? '카메라를 찾지 못했습니다. 웹캠이 연결되어 있는지 확인하세요.'
+      : name === 'NotReadableError' ? '다른 프로그램(줌, 카메라 앱 등)이 카메라를 쓰고 있습니다. 그 프로그램을 닫고 다시 누르세요.'
+      : '카메라를 켜지 못했습니다: ' + (e && e.message ? e.message : e);
+    camState('bad', '카메라 꺼짐');
+    note('err', why, 'cam');
+    applyUnlockMode();
+    return;
+  }
+  dropNote('cam');
+  const v = $('camVideo');
+  v.srcObject = CAM.stream; v.play().catch(() => {});
+  $('ovVideo').srcObject = CAM.stream;
+  $('camOff').style.display = 'none';
+  $('btnCam').textContent = '카메라 끄기';
+  $('btnCam').disabled = false;
+  savePrefs();
+  CAM.stream.getVideoTracks().forEach(t => t.addEventListener('ended', () => stopCamera('카메라 연결이 끊겼습니다')));
+  if (!CAM.raf) CAM.raf = requestAnimationFrame(camLoop);
+  renderMood();
+  applyUnlockMode();
+  if (!CAM.detector) {
+    camState('wait', '얼굴 인식 준비 중…');
+    if (!CAM.loading) CAM.loading = loadDetector();
+    try {
+      CAM.detector = await CAM.loading;
+      CAM.readyT = Date.now();
+      CAM.failed = false;
+      dropNote('detector');
+    } catch (e) {
+      CAM.loading = null; CAM.failed = true;
+      camState('bad', '얼굴 인식 실패');
+      note('warn', '얼굴 인식 도구를 불러오지 못했습니다(인터넷 연결 확인). 사진 찍기는 되지만 경고는 버튼으로 끕니다. 인터넷이 되면 카메라를 껐다 켜 보세요.', 'detector');
+      log('얼굴 인식 불러오기 실패: ' + (e && e.message ? e.message : e));
+    }
+  }
+  applyUnlockMode();
+}
+
+function stopCamera(reason) {
+  if (CAM.stream) CAM.stream.getTracks().forEach(t => t.stop());
+  CAM.stream = null;
+  $('camVideo').srcObject = null; $('ovVideo').srcObject = null;
+  $('camOff').style.display = '';
+  $('btnCam').textContent = '카메라 켜기';
+  $('btnCam').disabled = false;
+  CAM.face = false; CAM.smile = 0;
+  if (CAM.raf) { cancelAnimationFrame(CAM.raf); CAM.raf = 0; }
+  resetExpr();
+  camState('', reason ? '꺼짐 (' + reason + ')' : '꺼짐');
+  updateSmileUI();
+  savePrefs();
+  applyUnlockMode();
+  if (overlayOn()) { $('ovLiveBox').style.display = 'none'; evaluateUnlock(); }
+}
+
+function camLoop() {
+  CAM.raf = 0;
+  if (!CAM.stream) return;
+  camTick();
+  CAM.raf = requestAnimationFrame(camLoop);
+}
+/* 크롬이 뒤로 가면 requestAnimationFrame 이 멈추므로 타이머와 아두이노 신호로도 돌림 */
+setInterval(() => { if (CAM.stream && performance.now() - CAM.lastTick > 250) camTick(); }, 120);
+function camTick() {
+  if (!CAM.stream) return;
+  const v = $('camVideo');
+  const now = performance.now();
+  CAM.lastTick = now;
+  if (CAM.detector && v.readyState >= 2 && v.currentTime !== CAM.lastVideoTime && now - CAM.lastRun >= 45) {
+    CAM.lastVideoTime = v.currentTime; CAM.lastRun = now;
+    try {
+      const r = CAM.detector.detect(v, now);
+      CAM.face = !!r.face; CAM.smile = r.smile || 0; CAM.lastDetT = Date.now(); CAM.errCount = 0;
+      updateExpr(r);
+    } catch (e) {
+      CAM.face = false;
+      if (++CAM.errCount > 15 && !CAM.cpuRetry) {      // 그래픽 가속이 말썽이면 CPU 로 다시
+        CAM.cpuRetry = true; CAM.detector = null; applyUnlockMode();
+        log('얼굴 인식 오류가 계속되어 CPU 모드로 다시 불러옵니다: ' + (e && e.message ? e.message : e));
+        CAM.loading = loadDetector(true);
+        CAM.loading.then(d => { CAM.detector = d; CAM.readyT = Date.now(); CAM.errCount = 0; applyUnlockMode(); })
+                   .catch(() => { CAM.loading = null; camState('bad', '얼굴 인식 실패'); });
+      }
+    }
+    updateSmileUI();
+  }
+  const stale = camStale();
+  if (stale !== CAM.wasStale) { CAM.wasStale = stale; applyUnlockMode(); }
+  evaluateUnlock();
+}
+
+function updateSmileUI() {
+  const ok = smileReady();
+  const fresh = ok && CAM.face && Date.now() - CAM.lastDetT < freshMs();
+  const v = fresh ? CAM.smile : 0;
+  const th = S.smileTh;
+  $('vSmile').textContent = fresh ? v.toFixed(2) : '-';
+  $('barSmile').style.width = (v * 100) + '%';
+  $('markSmile').style.left = (th * 100) + '%';
+  $('ovSmileFill').style.width = (v * 100) + '%';
+  $('ovSmileMark').style.left = (th * 100) + '%';
+  $('ovLiveCap').textContent = !ok ? '얼굴 인식 준비 중' : !CAM.face ? '얼굴이 보이게 해 주세요' : v >= th ? '웃음 확인!' : '활짝 웃어 보세요';
+  if (CAM.stream && ok) camState(CAM.face ? 'on' : 'wait', CAM.face ? '준비됨: 얼굴 보임' : '얼굴이 안 보여요');
+}
+function camState(kind, text) {
+  const el = $('camState');
+  el.className = 'pill' + (kind ? ' ' + kind : '');
+  el.textContent = text;
+}
+
+/* 내려친 순간 사진 */
+function captureShot(label) {
+  const v = $('camVideo');
+  if (!CAM.stream || !$('cShot').checked || v.readyState < 2 || !v.videoWidth) return null;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  const g = c.getContext('2d');
+  g.translate(c.width, 0); g.scale(-1, 1);             // 거울처럼 (화면에 보이는 모습 그대로)
+  g.drawImage(v, 0, 0, c.width, c.height);
+  const shot = { url: c.toDataURL('image/jpeg', 0.85), time: clock(), file: stamp(), label, small: null };
+  if (HELPER.on) shot.small = smallPng(c, 320);
+  S.shots.unshift(shot);
+  if (S.shots.length > 24) S.shots.pop();
+  renderShots();
+  return shot;
+}
+function renderShots() {
+  const box = $('shots');
+  box.textContent = '';
+  if (!S.shots.length) {
+    const p = document.createElement('p'); p.className = 'hint'; p.style.margin = '0';
+    p.textContent = '아직 없음. 카메라를 켠 상태에서 내려치면 여기에 모입니다.';
+    box.append(p); return;
+  }
+  for (const s of S.shots) {
+    const a = document.createElement('a');
+    a.href = s.url; a.download = 'slam_' + s.file + '.jpg'; a.title = '눌러서 저장';
+    const img = document.createElement('img'); img.src = s.url; img.alt = s.time + ' ' + s.label + ' 사진';
+    const cap = document.createElement('span'); cap.textContent = s.time + ' · ' + s.label;
+    a.append(img, cap); box.append(a);
+  }
+}
+
+/* ---------------- 7) 표정 감지와 한줄 소감 ---------------- */
+const EXPR_TH = 0.45;                                  // 화남·슬픔 기준 (민감도를 곱한 값)
+const EXPR = { happy: 0, angry: 0, sad: 0, label: 'none', cand: 'none', candT: 0, comment: '', commentT: 0 };
+const EXPR_NAME = { happy: '웃는 얼굴', angry: '화난 얼굴', sad: '슬픈 얼굴', neutral: '평온한 얼굴', none: '얼굴 없음' };
+const COMMENTS = {   // calm = 평소, warn = "그러지 마세요" 화면이 떠 있을 때
+  happy: {
+    calm: ['그 미소면 오늘 코드도 술술 풀릴 거예요', '웃는 얼굴 보기 좋네요. 이 기분 그대로!', '좋아요, 키보드도 지금 행복해 보여요', '그 표정이면 버그도 무섭지 않죠'],
+    warn: ['좋아요! 그 웃음이면 키보드도 용서해 줄 거예요', '바로 그 표정이에요. 조금만 더 웃어요', '웃으니까 훨씬 낫죠? 화는 여기까지!']
+  },
+  angry: {
+    calm: ['미간에 힘이 들어갔어요. 숨 한 번 크게 쉬어 볼까요?', '화날 땐 키보드 말고 물 한 잔', '어깨 한 번 돌리고 다시 해요', '지금은 엔터를 살살 눌러 주세요'],
+    warn: ['화난 건 알겠어요. 그래도 키보드는 잘못 없어요', '억지 웃음도 괜찮아요. 웃어야 풀려요', '숨 크게 들이쉬고… 내쉬고… 이제 웃어 봐요']
+  },
+  sad: {
+    calm: ['오늘 좀 힘들었나요? 잠깐 쉬어 가도 괜찮아요', '토닥토닥. 천천히 해도 돼요', '기분 전환으로 좋아하는 노래 한 곡 어때요?'],
+    warn: ['속상했군요. 웃음 한 번이면 풀려요', '괜찮아요, 키보드도 이해해요. 살짝 웃어 볼까요?']
+  },
+  neutral: {
+    calm: ['집중하는 얼굴이네요. 화이팅!', '차분한 표정, 좋아요', '평온 그 자체. 이대로만 가요'],
+    warn: ['표정은 차분한데 손은 아니었네요. 웃으면 풀려요', '입꼬리를 살짝 올려 보세요']
+  },
+  none: {
+    calm: ['카메라에 얼굴이 보이면 표정을 읽어 드릴게요'],
+    warn: ['얼굴이 카메라에 보이게 해 주세요']
+  }
+};
+function classifyExpr(face) {
+  if (!face) return 'none';
+  const k = S.moodSens;
+  if (EXPR.happy >= S.smileTh) return 'happy';             // 웃음 기준은 경고 해제와 같은 값
+  const a = EXPR.angry * k, s = EXPR.sad * k;
+  if (a >= EXPR_TH && a >= s) return 'angry';
+  if (s >= EXPR_TH) return 'sad';
+  return 'neutral';
+}
+function updateExpr(r) {
+  const now = Date.now(), al = 0.35;                     // 점수를 부드럽게 (깜빡임 방지)
+  if (r.face) {
+    EXPR.happy += ((r.smile || 0) - EXPR.happy) * al;
+    EXPR.angry += ((r.angry || 0) - EXPR.angry) * al;
+    EXPR.sad += ((r.sad || 0) - EXPR.sad) * al;
+  }
+  const raw = classifyExpr(r.face);
+  if (raw !== EXPR.cand) { EXPR.cand = raw; EXPR.candT = now; }
+  if (EXPR.cand !== EXPR.label && now - EXPR.candT >= 600) { EXPR.label = EXPR.cand; newComment(); }  // 0.6초 이어지면 바뀜
+  else if (now - EXPR.commentT > 9000) newComment();     // 같은 표정이면 9초마다 다른 소감
+  renderMood();
+}
+function newComment() {
+  const set = (COMMENTS[EXPR.label] || COMMENTS.none)[overlayOn() ? 'warn' : 'calm'];
+  let c = set[Math.floor(Math.random() * set.length)];
+  if (set.length > 1 && c === EXPR.comment) c = set[(set.indexOf(c) + 1) % set.length];
+  EXPR.comment = c; EXPR.commentT = Date.now();
+  renderMood();
+}
+function resetExpr() {
+  EXPR.happy = EXPR.angry = EXPR.sad = 0; EXPR.label = EXPR.cand = 'none'; EXPR.comment = '';
+  renderMood();
+}
+function renderMood() {
+  const on = !!(CAM.stream && CAM.detector);
+  const name = EXPR_NAME[EXPR.label];
+  if (on && !EXPR.comment) { const set = COMMENTS[EXPR.label][overlayOn() ? 'warn' : 'calm']; EXPR.comment = set[0]; EXPR.commentT = Date.now(); }
+  $('mood').classList.toggle('show', on);
+  document.body.classList.toggle('moodon', on);
+  $('ovMood').classList.toggle('show', on);
+  for (const id of ['moodFace', 'ovFace', 'camFace']) {
+    const el = $(id);
+    el.textContent = on ? name : '-';
+    if (id !== 'ovFace') el.className = 'face ' + (on ? EXPR.label : 'neutral');
+  }
+  $('moodSay').textContent = $('ovSay').textContent = on ? EXPR.comment : '';
+  const fresh = on && CAM.face;
+  miniBar('Angry', fresh ? EXPR.angry * S.moodSens : 0, fresh);
+  miniBar('Sad', fresh ? EXPR.sad * S.moodSens : 0, fresh);
+}
+function miniBar(name, v, fresh) {
+  v = Math.max(0, Math.min(1, v));
+  $('bar' + name).style.width = (v * 100) + '%';
+  $('mark' + name).style.left = (EXPR_TH * 100) + '%';
+  $('bar' + name + 'Box').classList.toggle('over', v >= EXPR_TH);
+  $('v' + name).textContent = fresh ? v.toFixed(2) : '-';
+}
+
+/* ---------------- 8) 도우미 (slam_helper.py): 항상 위 경고 · 디스코드 ---------------- */
+const HELPER = { on: false, discord: null, kakao: null, busy: false, lastPingT: 0, lastFrameT: 0, window: true };
+const viaHelper = () => /^https?:$/.test(location.protocol);
+const FRAME = document.createElement('canvas');
+function smallPng(src, w) {                            // 도우미 창(tkinter)은 PNG 만 읽음
+  const h = Math.round(w * src.height / src.width);
+  FRAME.width = w; FRAME.height = h;
+  FRAME.getContext('2d').drawImage(src, 0, 0, w, h);
+  return FRAME.toDataURL('image/png').split(',')[1];
+}
+function liveFrame(w) {
+  const v = $('camVideo');
+  if (!CAM.stream || v.readyState < 2 || !v.videoWidth) return null;
+  const h = Math.round(w * v.videoHeight / v.videoWidth);
+  FRAME.width = w; FRAME.height = h;
+  const g = FRAME.getContext('2d');
+  g.setTransform(-1, 0, 0, 1, w, 0); g.drawImage(v, 0, 0, w, h); g.setTransform(1, 0, 0, 1, 0, 0);
+  return FRAME.toDataURL('image/png').split(',')[1];
+}
+async function helperFetch(path, body) {
+  try {
+    const opt = body === undefined ? { cache: 'no-store' }
+      : { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-Slam': '1' }, body: JSON.stringify(body) };
+    const r = await fetch(path, opt);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (j && j.discord) { HELPER.discord = j.discord; renderDiscordState(); }
+    if (j && j.kakao) { HELPER.kakao = j.kakao; renderKakao(); }
+    if (j && j.win) checkHelperWindow(j.win);
+    return j;
+  } catch (e) {
+    if (HELPER.on) {
+      HELPER.on = false; renderHelper();
+      note('warn', '도우미(slam_helper.py)와 연결이 끊겼습니다. 항상 위 경고와 디스코드 알림이 멈춥니다. 도우미를 다시 켜면 자동으로 이어집니다.', 'helper');
+    }
+    return null;
+  }
+}
+async function helperHello() {
+  if (!viaHelper()) { renderHelper(); return; }
+  const j = await helperFetch('/api/hello');
+  if (j && j.ok) {
+    HELPER.on = true; HELPER.window = j.window !== false; dropNote('helper');
+    renderHelper(); fillDiscordForm(); fillKakaoForm();
+    if (j.locked && !overlayOn()) restoreWarning(j.locked);
+  }
+}
+/* 경고 중에 창을 닫거나 새로 고쳤다 열었을 때: 경고를 다시 띄움 (횟수·디스코드는 다시 세지 않음) */
+function restoreWarning(lock) {
+  log('경고가 아직 안 풀려서 다시 띄웁니다.');
+  if (lock.holdMs) S.holdMs = lock.holdMs;
+  showWarning('창을 닫아도 안 풀려요 · ' + (lock.sub || ''), null);
+  helperFetch('/api/relock', { top: $('cTop').checked });
+}
+/* 경고 중에 닫으려 하면 크롬이 한 번 묻고, 닫히면 도우미에게 알림 (도우미가 다시 엶) */
+window.addEventListener('beforeunload', e => { if (overlayOn()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('pagehide', () => { if (HELPER.on && navigator.sendBeacon) navigator.sendBeacon('/api/bye', new Blob(['{}'], { type: 'text/plain' })); });
+function helperSlam(press, shake, test, shot) {
+  if (!HELPER.on) return;
+  helperFetch('/api/slam', {
+    top: $('cTop').checked, test, count: S.count, press, shake, holdMs: S.holdMs,
+    msg: $('ovMsg').textContent, sub: $('ovSub').textContent,
+    face: CAM.stream && CAM.detector && CAM.face ? EXPR_NAME[EXPR.label] : null,
+    shotPng: shot && shot.small ? shot.small : null,
+    shotJpeg: shot ? shot.url.split(',')[1] : null
+  }).then(() => { HELPER.lastPingT = 0; helperPump(); });
+}
+function overlayStatus(now) {
+  const vis = id => $(id).style.display !== 'none';
+  const st = {
+    active: true, msg: $('ovMsg').textContent, sub: $('ovSub').textContent, holdMs: S.holdMs,
+    text: $('holdText').textContent, frac: (parseFloat($('holdFill').style.width) || 0) / 100,
+    btn: ['b0', 'b1', 'b2'].map(id => ({ show: vis(id), on: $(id).classList.contains('on'), label: $(id).textContent })),
+    smile: smileReady() && CAM.face ? CAM.smile : null, smileTh: S.smileTh, liveCap: $('ovLiveCap').textContent,
+    mood: CAM.stream && CAM.detector ? { label: EXPR.label, name: EXPR_NAME[EXPR.label], say: EXPR.comment } : null
+  };
+  if (CAM.stream && now - HELPER.lastFrameT >= 250) {   // 웹캠 모습 1초에 4장
+    const f = liveFrame(320);
+    if (f) { st.live = f; HELPER.lastFrameT = now; }
+  }
+  return st;
+}
+/* 경고 중에는 0.15초마다, 평소에는 3초마다 도우미와 주고받음. 도우미 쪽 비상 해제는 여기로 돌아옴 */
+function helperPump() {
+  if (!HELPER.on || HELPER.busy) return;
+  const now = performance.now();
+  const active = overlayOn() && $('cTop').checked;
+  if (now - HELPER.lastPingT < (active ? 140 : 3000)) return;
+  HELPER.lastPingT = now;
+  HELPER.busy = true;
+  helperFetch('/api/status', active ? overlayStatus(now) : { active: false }).then(j => {
+    HELPER.busy = false;
+    for (const c of (j && j.cmds) || []) {
+      if (c === 'unlock' && overlayOn()) { log('도우미 창에서 비상 해제'); unlockNow(); }
+    }
+  });
+}
+setInterval(helperPump, 150);
+setInterval(() => { if (overlayOn() && UN.btnStart && !S.ardLocked) evaluateUnlock(); }, 100);
+setInterval(() => { if (viaHelper() && !HELPER.on) helperHello(); }, 4000);
+let lastSerialTick = 0;
+function serialTick() {
+  const t = performance.now();
+  if (t - lastSerialTick < 100) return;
+  lastSerialTick = t;
+  if (CAM.stream && t - CAM.lastTick > 150) camTick();
+  helperPump();
+}
+function renderHelper() {
+  const on = HELPER.on;
+  const pill = $('helperPill');
+  pill.className = 'pill' + (on ? ' on' : '');
+  pill.textContent = on ? '도우미 연결됨' : '도우미 꺼짐';
+  $('helperHint').textContent = on
+    ? (HELPER.window ? '도우미가 켜져 있어요. 경고가 뜨면 다른 창 위에도 빨간 화면이 뜨고, 설정한 디스코드·카카오톡으로 알림을 보냅니다.'
+                     : '도우미가 켜져 있지만 항상 위 창(tkinter)이 없어 디스코드 알림만 됩니다.')
+    : viaHelper()
+      ? '도우미를 찾는 중입니다. slam_helper.py 가 켜져 있는지 확인하세요.'
+      : '지금은 파일로 열려 있어 크롬 안에서만 경고가 뜹니다. 다른 창 위에 경고를 띄우고 디스코드로 알리려면 slam_helper.py 를 실행해서 여세요.';
+  for (const id of ['cTop', 'tHook', 'tName', 'sCool', 'cPhoto', 'cHere', 'btnDcSave', 'btnDcTest', 'btnDcClear',
+                    'tKakaoKey', 'tKakaoSecret', 'cKakaoOn', 'cKakaoPhoto', 'btnKakaoSave', 'btnKakaoLogin', 'btnKakaoTest', 'btnKakaoLogout']) $(id).disabled = !on;
+  renderDiscordState();
+  renderKakao();
+}
+function renderDiscordState() {
+  const d = HELPER.discord;
+  $('dcState').textContent = !HELPER.on ? '' : d && d.configured ? '· 웹훅 저장됨 ' + d.hint : '· 아직 설정 안 됨';
+  if (d && d.last && !$('dcResult').dataset.busy) $('dcResult').textContent = '마지막 알림: ' + d.last;
+}
+function fillDiscordForm() {
+  const d = HELPER.discord; if (!d) return;
+  $('tName').value = d.name || '';
+  $('cPhoto').checked = !!d.send_photo;
+  $('cHere').checked = !!d.mention_here;
+  const opt = Array.from($('sCool').options).some(o => +o.value === d.cooldown_sec);
+  if (!opt) { const o = document.createElement('option'); o.value = d.cooldown_sec; o.textContent = d.cooldown_sec + '초'; $('sCool').append(o); }
+  $('sCool').value = String(d.cooldown_sec);
+}
+async function saveDiscord(extra) {
+  const body = Object.assign({ name: $('tName').value, send_photo: $('cPhoto').checked, mention_here: $('cHere').checked,
+                               cooldown_sec: +$('sCool').value }, extra || {});
+  const url = $('tHook').value.trim();
+  if (url) body.webhook_url = url;
+  const j = await helperFetch('/api/config', body);
+  if (!j) return false;
+  if (j.error) { $('dcResult').textContent = j.error; return false; }
+  $('tHook').value = '';
+  $('dcResult').textContent = '저장했습니다. 설정은 도우미 폴더의 slam_config.json 에 있습니다.';
+  return true;
+}
+async function testDiscord() {
+  const r = $('dcResult');
+  if ($('tHook').value.trim() && !(await saveDiscord())) return;
+  r.dataset.busy = '1'; r.textContent = '보내는 중…';
+  const j = await helperFetch('/api/discord-test', {});
+  delete r.dataset.busy;
+  r.textContent = !j ? '도우미와 연결이 안 됩니다.' : j.ok ? '보냈습니다! 디스코드 채널을 확인하세요.' : j.error;
+}
+
+/* 항상 위 창이 왜 안 뜨는지 화면에 바로 알려 줌 */
+function checkHelperWindow(w) {
+  if (w.error && w.error !== HELPER.lastWinErr) { HELPER.lastWinErr = w.error; log('도우미 경고 창 오류: ' + w.error); }
+  if (!$('cTop').checked) {
+    note('info', '"경고를 다른 모든 창보다 앞에 띄우기"가 꺼져 있어서 크롬 안에서만 경고가 뜹니다. 아래 "도우미" 칸에서 켜세요.', 'helperwin');
+  } else if (!w.ok && w.why === 'no-tkinter') {
+    note('warn', '도우미가 항상 위 창을 띄울 수 없습니다(파이썬에 tkinter 없음). python.org 에서 파이썬을 다시 설치하고 도우미를 다시 실행하세요.', 'helperwin');
+  } else if (!w.ok) {
+    note('warn', '도우미의 항상 위 창이 응답하지 않습니다. 작은 도우미 창을 닫고 run_helper.bat 을 다시 실행하세요.' + (w.error ? ' (마지막 오류: ' + w.error + ')' : ''), 'helperwin');
+  } else dropNote('helperwin');
+}
+
+/* 카카오톡 나에게 보내기 */
+function renderKakao() {
+  const k = HELPER.kakao;
+  if (!HELPER.on || !k) { $('kkState').textContent = ''; return; }
+  $('kkRedirect').textContent = k.redirect_uri; $('kkSite').textContent = k.site;
+  $('kkState').textContent = !k.key_set ? '· REST API 키를 먼저 저장하세요'
+    : !k.logged_in ? '· 키 저장됨 ' + k.key_hint + ', 로그인 필요'
+    : '· 로그인됨' + (k.login_days_left != null ? ' (약 ' + k.login_days_left + '일 뒤 다시 로그인)' : '') + (k.enabled ? '' : ', 보내기 꺼 둠');
+  $('btnKakaoLogin').textContent = k.logged_in ? '다시 로그인' : '카카오 로그인';
+  if (k.last && !$('kkResult').dataset.busy) $('kkResult').textContent = '마지막: ' + k.last;
+}
+function fillKakaoForm() {
+  const k = HELPER.kakao; if (!k) return;
+  $('cKakaoOn').checked = !!k.enabled; $('cKakaoPhoto').checked = !!k.send_photo;
+}
+async function saveKakao(extra) {
+  const body = Object.assign({ enabled: $('cKakaoOn').checked, send_photo: $('cKakaoPhoto').checked }, extra || {});
+  const key = $('tKakaoKey').value.trim(), sec = $('tKakaoSecret').value.trim();
+  if (key) body.rest_key = key;
+  if (sec) body.client_secret = sec;
+  const j = await helperFetch('/api/kakao/config', body);
+  if (!j) return false;
+  if (j.error) { $('kkResult').textContent = j.error; return false; }
+  $('tKakaoKey').value = ''; $('tKakaoSecret').value = '';
+  return true;
+}
+async function kakaoLogin() {
+  if (($('tKakaoKey').value.trim() || $('tKakaoSecret').value.trim()) && !(await saveKakao())) return;
+  if (!HELPER.kakao || !HELPER.kakao.key_set) { $('kkResult').textContent = '먼저 REST API 키를 넣고 [키 저장]을 누르세요.'; return; }
+  window.open('/kakao/login', '_blank');
+  $('kkResult').textContent = '새 탭에서 카카오 로그인과 "카카오톡 메시지 전송" 동의를 마치면 여기가 저절로 바뀝니다.';
+  const t0 = Date.now(), was = HELPER.kakao.logged_in;
+  const poll = setInterval(async () => {
+    const j = await helperFetch('/api/hello');
+    if (j && j.kakao && j.kakao.logged_in && (!was || Date.now() - t0 > 3000)) {
+      clearInterval(poll); $('kkResult').textContent = '로그인됐어요! [나에게 테스트 보내기]로 확인해 보세요.';
+    }
+    if (Date.now() - t0 > 180000) clearInterval(poll);
+  }, 2000);
+}
+async function kakaoTest() {
+  const r = $('kkResult');
+  r.dataset.busy = '1'; r.textContent = '보내는 중…';
+  const j = await helperFetch('/api/kakao/test', {});
+  delete r.dataset.busy;
+  r.textContent = !j ? '도우미와 연결이 안 됩니다.' : j.ok ? '보냈습니다! 카카오톡 "나와의 채팅"을 확인하세요.' : j.error;
+}
+
+/* ---------------- 9) 공통 ---------------- */
+function onCalDone(pt, st, tp, ts, taps) {
+  S.calibrating = false;
+  $('btnCal').disabled = false;
+  $('calText').textContent = '보정 끝! 타자 압력 약 ' + tp + ' → 압력 기준 ' + pt + ', 타자 진동 최대 ' + ts + ' → 진동 기준 ' + st +
+    ' (잡힌 타자 ' + taps + '번). 이제 내려쳐서 경고가 뜨는지 확인해 보세요.';
+  if (pt >= 400) note('warn', '타자에도 압력이 크게 나와요. 동전을 빼거나, 압력 센서를 스페이스바에서 조금 먼 곳으로 옮긴 뒤 다시 보정해 보세요.', 'calpress');
+  else dropNote('calpress');
+  if (st >= 900) note('warn', '타자에도 진동이 크게 나와요. 진동 모듈의 금색 판을 키보드 밑이 아니라 키보드 옆 책상에 테이프로 붙이고 다시 보정해 보세요.', 'calshake');
+  else dropNote('calshake');
+  if (taps < 5) note('info', '보정하는 동안 잡힌 타자가 ' + taps + '번뿐이에요. 타자가 아주 약하게 잡힌다는 뜻이라 괜찮지만, 센서가 제대로 붙어 있는지 한 번 확인해 보세요.', 'caltaps');
+  else dropNote('caltaps');
+}
+function setStatus(state) {
+  const st = $('st');
+  st.classList.remove('on', 'wait');
+  if (state === 'on') { st.textContent = '연결됨'; st.classList.add('on'); }
+  else if (state === 'wait') { st.textContent = '준비 중 (손 떼기)'; st.classList.add('wait'); }
+  else { st.textContent = '연결 안 됨'; }
+  $('btnConnect').textContent = state === 'off' ? '아두이노 연결' : '연결 끊기';
+}
+function note(kind, text, key) {
+  let el = key ? document.querySelector('#notes [data-key="' + key + '"]') : null;
+  if (!el) { el = document.createElement('div'); if (key) el.dataset.key = key; $('notes').append(el); }
+  el.className = 'note ' + kind;
+  el.textContent = text;
+}
+function dropNote(key) {
+  const el = document.querySelector('#notes [data-key="' + key + '"]');
+  if (el) el.remove();
+}
+function log(t) {
+  const el = $('log');
+  el.textContent += '\n' + t;
+  if (el.textContent.length > 8000) el.textContent = el.textContent.slice(-6000);
+  el.scrollTop = el.scrollHeight;
+}
+/* 화면 설정 기억 (이 컴퓨터의 크롬에만) */
+const PREF_KEY = 'slamFinalPrefs';
+function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch (e) { return {}; } }
+function savePrefs() {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify({
+      unlock: $('sUnlock').value, smileTh: S.smileTh, smileSec: S.smileHoldMs / 1000,
+      shot: $('cShot').checked, msg: $('tMsg').value, voice: $('cVoice').checked, camOn: !!CAM.stream,
+      top: $('cTop').checked, moodSens: S.moodSens
+    }));
+  } catch (e) {}
+}
+
+/* ---------------- 10) 버튼과 설정 ---------------- */
+function needConn() {
+  if (S.ready) return true;
+  note('info', '먼저 [아두이노 연결]을 눌러 연결하세요.', 'needconn');
+  setTimeout(() => dropNote('needconn'), 4000);
+  return false;
+}
+$('btnConnect').onclick = connect;
+$('btnTest').onclick = () => {
+  if (S.ready) send('X');
+  else onSlam(0, 0, true);
+};
+$('btnFull').onclick = () => { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); };
+$('btnReset').onclick = () => { S.count = 0; $('vCount').textContent = 0; $('vLast').textContent = '없음'; };
+$('btnCam').onclick = () => { if (CAM.stream) stopCamera(); else startCamera(); };
+$('btnSaveAll').onclick = () => {
+  const links = Array.from(document.querySelectorAll('#shots a'));
+  links.forEach((a, i) => setTimeout(() => a.click(), i * 300));
+};
+$('btnClearShots').onclick = () => { S.shots = []; renderShots(); };
+
+let calCountdown = null;
+$('btnCal').onclick = () => {
+  if (!needConn() || calCountdown) return;
+  $('btnCal').disabled = true;
+  let k = 3;
+  $('calText').textContent = '키보드에 손을 올려 두세요. ' + k + '초 뒤에 시작합니다…';
+  calCountdown = setInterval(() => {
+    k--;
+    if (k > 0) { $('calText').textContent = '키보드에 손을 올려 두세요. ' + k + '초 뒤에 시작합니다…'; return; }
+    clearInterval(calCountdown); calCountdown = null;
+    S.calibrating = true;
+    $('calText').textContent = '시작! 10초 동안 평소처럼 타자를 치세요 (스페이스바, 엔터 포함).';
+    send('K');
+    setTimeout(() => { if (S.calibrating) { S.calibrating = false; $('btnCal').disabled = false; } }, 15000);
+  }, 1000);
+};
+$('btnBase').onclick = () => {
+  if (!needConn()) return;
+  $('baseText').textContent = '센서에서 손을 떼세요… 1초 뒤에 잽니다.';
+  setTimeout(() => send('B'), 1000);
+};
+
+$('sMode').onchange = e => { S.mode = +e.target.value; $('modeHint').textContent = MODE_TEXT[S.mode]; send('D' + e.target.value); };
+$('sHits').onchange = e => { S.hits = +e.target.value; send('N' + e.target.value); };
+$('rW').oninput = e => { S.pressTh = +e.target.value; $('lW').textContent = S.pressTh; $('tPress').textContent = S.pressTh; setBar('Press', S.dispPress, S.pressTh); };
+$('rW').onchange = e => send('W' + e.target.value);
+$('rP').oninput = e => { S.shakeTh = +e.target.value; $('lP').textContent = S.shakeTh; $('tShake').textContent = S.shakeTh; setBar('Shake', S.dispShake, S.shakeTh); };
+$('rP').onchange = e => send('P' + e.target.value);
+$('rT').oninput = e => { $('lT').textContent = e.target.value; };
+$('rT').onchange = e => { S.holdMs = Math.round(e.target.value * 1000); updateUnlockTexts(); send('T' + S.holdMs); };
+$('cBuzz').onchange = e => { S.muted = e.target.checked ? 0 : 1; send(e.target.checked ? 'M0' : 'M1'); };
+$('sUnlock').onchange = () => { savePrefs(); applyUnlockMode(); evaluateUnlock(); };
+$('rSmile').oninput = e => { S.smileTh = +e.target.value; $('lSmile').textContent = S.smileTh.toFixed(2); $('tSmile').textContent = S.smileTh.toFixed(2); updateSmileUI(); };
+$('rSmile').onchange = savePrefs;
+$('rSmileT').oninput = e => { S.smileHoldMs = Math.round(e.target.value * 1000); $('lSmileT').textContent = e.target.value; updateUnlockTexts(); };
+$('rSmileT').onchange = savePrefs;
+['cShot', 'cVoice', 'tMsg', 'cTop'].forEach(id => $(id).addEventListener('change', savePrefs));
+$('cTop').addEventListener('change', () => { HELPER.lastPingT = 0; helperPump(); });
+$('rMood').oninput = e => { S.moodSens = +e.target.value; $('lMood').textContent = S.moodSens.toFixed(1); renderMood(); };
+$('rMood').onchange = savePrefs;
+$('btnDcSave').onclick = () => saveDiscord();
+$('btnDcTest').onclick = testDiscord;
+$('btnDcClear').onclick = () => { $('tHook').value = ''; saveDiscord({ clear_webhook: true }).then(ok => { if (ok) $('dcResult').textContent = '웹훅을 지웠습니다. 이제 디스코드로 알림을 보내지 않습니다.'; }); };
+['cPhoto', 'cHere', 'sCool'].forEach(id => $(id).addEventListener('change', () => saveDiscord()));
+$('btnKakaoSave').onclick = () => saveKakao().then(ok => { if (ok) $('kkResult').textContent = '저장했습니다. 이제 [카카오 로그인]을 누르세요.'; });
+$('btnKakaoLogin').onclick = kakaoLogin;
+$('btnKakaoTest').onclick = kakaoTest;
+$('btnKakaoLogout').onclick = () => helperFetch('/api/kakao/logout', {}).then(j => { if (j) $('kkResult').textContent = '로그아웃했습니다.'; });
+['cKakaoOn', 'cKakaoPhoto'].forEach(id => $(id).addEventListener('change', () => saveKakao()));
+$('btnHold').addEventListener('pointerdown', softDown);
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('btnHold').addEventListener(ev, softUp));
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('disconnect', e => { if (S.port && e.target === S.port) disconnect(); });
+}
+
+/* 시작 */
+(function init() {
+  const pf = loadPrefs();
+  if (pf.unlock && ['smile_btn', 'smile', 'either', 'btn'].includes(pf.unlock)) $('sUnlock').value = pf.unlock;
+  if (typeof pf.smileTh === 'number') { S.smileTh = pf.smileTh; $('rSmile').value = pf.smileTh; }
+  if (typeof pf.smileSec === 'number') { S.smileHoldMs = pf.smileSec * 1000; $('rSmileT').value = pf.smileSec; }
+  if (typeof pf.shot === 'boolean') $('cShot').checked = pf.shot;
+  if (typeof pf.msg === 'string' && pf.msg.trim()) $('tMsg').value = pf.msg;
+  if (typeof pf.voice === 'boolean') $('cVoice').checked = pf.voice;
+  if (typeof pf.top === 'boolean') $('cTop').checked = pf.top;
+  if (typeof pf.moodSens === 'number') { S.moodSens = pf.moodSens; $('rMood').value = pf.moodSens; }
+  $('lMood').textContent = S.moodSens.toFixed(1);
+  $('lSmile').textContent = $('tSmile').textContent = S.smileTh.toFixed(2);
+  $('lSmileT').textContent = S.smileHoldMs / 1000;
+  syncControls();
+  updateSmileUI();
+  renderShots();
+  applyUnlockMode();
+  renderMood();
+  renderHelper();
+  helperHello();
+  if (pf.camOn) startCamera();
+  autoConnect();
+})();
+</script>
+</body>
+</html>
